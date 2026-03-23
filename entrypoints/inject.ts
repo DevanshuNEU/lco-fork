@@ -1,14 +1,21 @@
-// entrypoints/inject.ts - Main world fetch interceptor and Claude SSE decoder
+// entrypoints/inject.ts - Main world fetch interceptor and Claude SSE decoder (Room 1)
 // Runs in the page's JavaScript context (Room 1).
-// Note: This script is entirely self-contained. Do not import from lib/ to prevent 
+// This script is entirely self-contained — no imports from lib/ to prevent
 // chrome.* API references from bleeding into the unprivileged page context.
-// WXT injects this as an unlisted script via injectScript() from the content script.
+// WXT injects this as an unlisted script via injectScript() from the content script,
+// passing the session token and platform via dataset attributes.
 
 export default defineUnlistedScript(() => {
     (function () {
         // Provider Configuration (Inlined)
         const CLAUDE_COMPLETION_SUFFIX = '/completion';
         const CLAUDE_CONVERSATION_PATTERN = '/chat_conversations/';
+
+        // LCO_V1 Bridge Security Constants (Inlined)
+        // Session token and platform are injected by the content script at load time.
+        const LCO_NAMESPACE = 'LCO_V1';
+        const SESSION_TOKEN = document.currentScript?.dataset.sessionToken ?? '';
+        const PLATFORM = document.currentScript?.dataset.platform ?? 'claude';
 
         // Capture the original fetch function before it is modified by platform wrappers
         const originalFetch = window.fetch;
@@ -22,11 +29,34 @@ export default defineUnlistedScript(() => {
             return url.includes(CLAUDE_CONVERSATION_PATTERN) && url.includes('rendering_mode=messages');
         }
 
-        // Token Counting Bridge
+        // Secure Bridge: postMessage with LCO_V1 namespace + session token
+        // Messages are batched every 200ms to avoid saturating the bridge.
+        // Never uses '*' as targetOrigin — always scoped to the current origin.
+        function postSecureBatch(payload: {
+            type: 'TOKEN_BATCH' | 'STREAM_COMPLETE' | 'HEALTH_BROKEN';
+            inputTokens?: number;
+            outputTokens?: number;
+            model?: string;
+            stopReason?: string | null;
+            message?: string;
+        }) {
+            window.postMessage(
+                {
+                    namespace: LCO_NAMESPACE,
+                    token: SESSION_TOKEN,
+                    platform: PLATFORM,
+                    ...payload,
+                },
+                window.location.origin,
+            );
+        }
+
+        // Token Counting Bridge (internal, for BPE estimation via background worker)
         let _tokenIdCounter = 0;
         const _pendingTokenRequests = new Map<number, (count: number) => void>();
 
         window.addEventListener('message', (event) => {
+            // Only accept responses from our own BPE counter bridge
             if (event.source !== window || !event.data || event.data.type !== 'LCO_TOKEN_RES') return;
             const { id, count } = event.data;
             const resolve = _pendingTokenRequests.get(id);
@@ -42,8 +72,8 @@ export default defineUnlistedScript(() => {
                 const id = ++_tokenIdCounter;
                 _pendingTokenRequests.set(id, resolve);
                 window.postMessage({ type: 'LCO_TOKEN_REQ', id, text }, '*');
-                
-                // Fallback timeout to prevent memory leaks if the bridge fails
+
+                // Fallback timeout to prevent memory leaks if the bridge is unavailable
                 setTimeout(() => {
                     if (_pendingTokenRequests.has(id)) {
                         _pendingTokenRequests.delete(id);
@@ -65,19 +95,18 @@ export default defineUnlistedScript(() => {
             evt: any,
             health: HealthState,
             summary: { inputTokens: number; outputTokens: number; model: string },
-            promptText: string
+            promptText: string,
         ) {
             const type = evt.type;
 
             if (type === 'message_start') {
                 health.sawMessageStart = true;
-                
-                // Count input tokens natively using the local tokenizer proxy
+
                 if (promptText) {
                     summary.inputTokens = await countTokens(promptText);
                     console.log(`[LCO] message_start : input: ~${summary.inputTokens} tokens (local BPE)`);
                 } else {
-                    console.log(`[LCO] message_start : input: ~0 tokens (missing prompt)`);
+                    console.log('[LCO] message_start : input: ~0 tokens (missing prompt)');
                 }
             }
 
@@ -109,11 +138,11 @@ export default defineUnlistedScript(() => {
             }
         }
 
-        // SSE Stream Decoder
+        // SSE Stream Decoder with 200ms Batch Flushing
         async function decodeSSEStream(
             stream: ReadableStream<Uint8Array>,
             requestModel: string,
-            promptText: string
+            promptText: string,
         ) {
             const reader = stream.getReader();
             const decoder = new TextDecoder('utf-8');
@@ -129,10 +158,26 @@ export default defineUnlistedScript(() => {
             const summary = {
                 inputTokens: 0,
                 outputTokens: 0,
-                model: requestModel, 
+                model: requestModel,
             };
 
             let lastDataTime = Date.now();
+
+            // 200ms batch flush timer — groups token data into single postMessage bursts
+            let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+            function scheduleBatchFlush() {
+                if (flushTimer !== null) return; // already scheduled
+                flushTimer = setTimeout(() => {
+                    flushTimer = null;
+                    postSecureBatch({
+                        type: 'TOKEN_BATCH',
+                        inputTokens: summary.inputTokens,
+                        outputTokens: summary.outputTokens,
+                        model: summary.model,
+                    });
+                }, 200);
+            }
 
             // Watchdog interval to detect and close stalled connections
             const watchdog = setInterval(() => {
@@ -175,6 +220,11 @@ export default defineUnlistedScript(() => {
                             const evt = JSON.parse(raw);
                             health.chunksProcessed++;
                             await handleClaudeEvent(evt, health, summary, promptText);
+
+                            // Schedule a batch flush after processing each event with token data
+                            if (evt.type === 'message_start' || evt.type === 'content_block_delta') {
+                                scheduleBatchFlush();
+                            }
                         } catch {
                             console.debug('[LCO] Skipped malformed JSON payload in SSE stream');
                         }
@@ -182,7 +232,23 @@ export default defineUnlistedScript(() => {
                 }
             } finally {
                 clearInterval(watchdog);
+
+                // Cancel any pending flush and fire a final authoritative STREAM_COMPLETE
+                if (flushTimer !== null) {
+                    clearTimeout(flushTimer);
+                    flushTimer = null;
+                }
+
                 reader.releaseLock();
+
+                // Send final complete event to the content script bridge
+                postSecureBatch({
+                    type: 'STREAM_COMPLETE',
+                    inputTokens: summary.inputTokens,
+                    outputTokens: summary.outputTokens,
+                    model: summary.model,
+                    stopReason: health.stopReason,
+                });
 
                 console.log(
                     `%c[LCO] [Complete] model: ${summary.model}` +
@@ -193,6 +259,11 @@ export default defineUnlistedScript(() => {
                 );
 
                 if (!health.sawMessageStart && health.chunksProcessed >= 10) {
+                    // Surface a health broken event so the UI can show a warning
+                    postSecureBatch({
+                        type: 'HEALTH_BROKEN',
+                        message: `${health.chunksProcessed} chunks processed but missing Claude lifecycle events.`,
+                    });
                     console.warn(
                         '[LCO-ERROR] Health check failed: ' +
                         `${health.chunksProcessed} chunks processed but missing Claude lifecycle events.`,
@@ -206,11 +277,12 @@ export default defineUnlistedScript(() => {
             const result = { model: 'unknown', prompt: '' };
             if (!init?.body) return result;
             try {
-                const bodyStr = typeof init.body === 'string'
-                    ? init.body
-                    : init.body instanceof ArrayBuffer
-                        ? new TextDecoder().decode(init.body)
-                        : null;
+                const bodyStr =
+                    typeof init.body === 'string'
+                        ? init.body
+                        : init.body instanceof ArrayBuffer
+                            ? new TextDecoder().decode(init.body)
+                            : null;
                 if (!bodyStr) return result;
                 const parsed = JSON.parse(bodyStr);
                 if (parsed.model) result.model = parsed.model;
@@ -221,7 +293,7 @@ export default defineUnlistedScript(() => {
             }
         }
 
-        // Post-Stream Application Probe
+        // Post-Stream Application Probe (for future network-shape analysis)
         async function probeConversationResponse(response: Response) {
             try {
                 const cloned = response.clone();
@@ -231,7 +303,7 @@ export default defineUnlistedScript(() => {
                 if (!hasTokens) {
                     // Left empty for future network-shape debugging
                 }
-            } catch (err) { }
+            } catch { }
         }
 
         // Intercept API Requests

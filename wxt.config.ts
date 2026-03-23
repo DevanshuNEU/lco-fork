@@ -11,7 +11,7 @@ export default defineConfig({
   manifest: {
     name: 'Local Context Optimizer',
     description: 'Real-time token counting and cost tracking for AI platforms',
-    permissions: ['storage', 'tabs', 'scripting'],
+    permissions: ['storage', 'tabs', 'scripting', 'alarms'],
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
     },
