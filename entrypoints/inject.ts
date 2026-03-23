@@ -33,12 +33,13 @@ export default defineUnlistedScript(() => {
         // Messages are batched every 200ms to avoid saturating the bridge.
         // Never uses '*' as targetOrigin — always scoped to the current origin.
         function postSecureBatch(payload: {
-            type: 'TOKEN_BATCH' | 'STREAM_COMPLETE' | 'HEALTH_BROKEN';
+            type: 'TOKEN_BATCH' | 'STREAM_COMPLETE' | 'HEALTH_BROKEN' | 'MESSAGE_LIMIT_UPDATE';
             inputTokens?: number;
             outputTokens?: number;
             model?: string;
             stopReason?: string | null;
             message?: string;
+            messageLimitUtilization?: number;
         }) {
             window.postMessage(
                 {
@@ -71,7 +72,7 @@ export default defineUnlistedScript(() => {
             return new Promise((resolve) => {
                 const id = ++_tokenIdCounter;
                 _pendingTokenRequests.set(id, resolve);
-                window.postMessage({ type: 'LCO_TOKEN_REQ', id, text }, '*');
+                window.postMessage({ type: 'LCO_TOKEN_REQ', id, text }, window.location.origin);
 
                 // Fallback timeout to prevent memory leaks if the bridge is unavailable
                 setTimeout(() => {
@@ -91,7 +92,7 @@ export default defineUnlistedScript(() => {
             stopReason: string | null;
         }
 
-        async function handleClaudeEvent(
+        function handleClaudeEvent(
             evt: any,
             health: HealthState,
             summary: { inputTokens: number; outputTokens: number; model: string },
@@ -103,10 +104,23 @@ export default defineUnlistedScript(() => {
                 health.sawMessageStart = true;
 
                 if (promptText) {
-                    summary.inputTokens = await countTokens(promptText);
-                    console.log(`[LCO] message_start : input: ~${summary.inputTokens} tokens (local BPE)`);
+                    countTokens(promptText).then((count) => {
+                        summary.inputTokens = count;
+                        console.log(`[LCO] message_start : input: ~${summary.inputTokens} tokens (local BPE)`);
+                    });
                 } else {
                     console.log('[LCO] message_start : input: ~0 tokens (missing prompt)');
+                }
+            }
+
+            if (type === 'message_limit') {
+                const utilization = evt.message_limit?.windows?.overage?.utilization;
+                if (typeof utilization === 'number') {
+                    console.log(`[LCO] message_limit : utilization: ${(utilization * 100).toFixed(1)}%`);
+                    postSecureBatch({
+                        type: 'MESSAGE_LIMIT_UPDATE',
+                        messageLimitUtilization: utilization,
+                    });
                 }
             }
 
@@ -117,10 +131,11 @@ export default defineUnlistedScript(() => {
             if (type === 'content_block_delta') {
                 const delta = evt.delta ?? {};
                 if (delta.type === 'text_delta' && delta.text) {
-                    const chunkTokens = await countTokens(delta.text);
-                    summary.outputTokens += chunkTokens;
-                    const preview = delta.text.length > 80 ? delta.text.slice(0, 80) + '...' : delta.text;
-                    console.log(`[LCO] content_block_delta : "${preview}" : ~${chunkTokens} tokens (local BPE)`);
+                    countTokens(delta.text).then((chunkTokens) => {
+                        summary.outputTokens += chunkTokens;
+                        const preview = delta.text.length > 80 ? delta.text.slice(0, 80) + '...' : delta.text;
+                        console.log(`[LCO] content_block_delta : "${preview}" : ~${chunkTokens} tokens (local BPE)`);
+                    });
                 }
             }
 
@@ -219,7 +234,7 @@ export default defineUnlistedScript(() => {
                         try {
                             const evt = JSON.parse(raw);
                             health.chunksProcessed++;
-                            await handleClaudeEvent(evt, health, summary, promptText);
+                            handleClaudeEvent(evt, health, summary, promptText);
 
                             // Schedule a batch flush after processing each event with token data
                             if (evt.type === 'message_start' || evt.type === 'content_block_delta') {
