@@ -53,9 +53,10 @@ async function writeTabState(
   const stateKey = tabStateKey(tabId);
   const costKey = sessionCostKey(tabId);
 
-  // Read existing session cost to accumulate across multiple requests in the same tab
+  // Read existing session cost to accumulate across multiple requests in the same tab.
+  // Cast explicitly — browser.storage.session.get returns Record<string, any>.
   const existing = await browser.storage.session.get([costKey]);
-  const prev: SessionCost = existing[costKey] ?? {
+  const prev: SessionCost = (existing[costKey] as SessionCost | undefined) ?? {
     totalInputTokens: 0,
     totalOutputTokens: 0,
     requestCount: 0,
