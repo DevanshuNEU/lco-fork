@@ -102,15 +102,12 @@ export default defineUnlistedScript(() => {
 
             if (type === 'message_start') {
                 health.sawMessageStart = true;
-
+                // Use chars/4 as a fast synchronous estimate for real-time batch flushes.
+                // Accurate BPE counts are computed once in the finally block.
                 if (promptText) {
-                    countTokens(promptText).then((count) => {
-                        summary.inputTokens = count;
-                        console.log(`[LCO] message_start : input: ~${summary.inputTokens} tokens (local BPE)`);
-                    });
-                } else {
-                    console.log('[LCO] message_start : input: ~0 tokens (missing prompt)');
+                    summary.inputTokens = Math.round(promptText.length / 4);
                 }
+                console.log(`[LCO] message_start : input: ~${summary.inputTokens} tokens (chars/4 estimate)`);
             }
 
             if (type === 'message_limit') {
@@ -126,17 +123,6 @@ export default defineUnlistedScript(() => {
 
             if (type === 'content_block_start') {
                 health.sawContentBlock = true;
-            }
-
-            if (type === 'content_block_delta') {
-                const delta = evt.delta ?? {};
-                if (delta.type === 'text_delta' && delta.text) {
-                    countTokens(delta.text).then((chunkTokens) => {
-                        summary.outputTokens += chunkTokens;
-                        const preview = delta.text.length > 80 ? delta.text.slice(0, 80) + '...' : delta.text;
-                        console.log(`[LCO] content_block_delta : "${preview}" : ~${chunkTokens} tokens (local BPE)`);
-                    });
-                }
             }
 
             if (type === 'message_delta') {
@@ -175,6 +161,9 @@ export default defineUnlistedScript(() => {
                 outputTokens: 0,
                 model: requestModel,
             };
+
+            // Accumulates all output text synchronously; BPE counted once on stream end.
+            let outputTextBuffer = '';
 
             let lastDataTime = Date.now();
 
@@ -236,6 +225,15 @@ export default defineUnlistedScript(() => {
                             health.chunksProcessed++;
                             handleClaudeEvent(evt, health, summary, promptText);
 
+                            // Accumulate output text synchronously; update estimate with chars/4.
+                            if (evt.type === 'content_block_delta') {
+                                const delta = evt.delta ?? {};
+                                if (delta.type === 'text_delta' && delta.text) {
+                                    outputTextBuffer += delta.text;
+                                    summary.outputTokens = Math.round(outputTextBuffer.length / 4);
+                                }
+                            }
+
                             // Schedule a batch flush after processing each event with token data
                             if (evt.type === 'message_start' || evt.type === 'content_block_delta') {
                                 scheduleBatchFlush();
@@ -255,6 +253,15 @@ export default defineUnlistedScript(() => {
                 }
 
                 reader.releaseLock();
+
+                // Compute accurate BPE counts once on the full accumulated text.
+                // Both calls run in parallel; fall back to the chars/4 estimate on failure.
+                const [inputCount, outputCount] = await Promise.all([
+                    countTokens(promptText),
+                    countTokens(outputTextBuffer),
+                ]);
+                if (inputCount > 0) summary.inputTokens = inputCount;
+                if (outputCount > 0) summary.outputTokens = outputCount;
 
                 // Send final complete event to the content script bridge
                 postSecureBatch({
