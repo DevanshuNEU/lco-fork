@@ -1,19 +1,21 @@
 // lib/platform-config.ts
-// Source-of-truth config for provider endpoints and SSE event types.
-// inject.ts does NOT import this file (it's self-contained in the MAIN world).
-// This module is used by Room 2 (content script) and Room 3 (service worker).
+// Centralized configuration defining provider endpoints and SSE event hierarchies.
+// 
+// Architecture Note: This file is intentionally not imported by inject.ts 
+// (the Main World interceptor) to ensure strict isolation. It is utilized 
+// only by Room 2 (the content script) and Room 3 (the background worker).
 
 export const PROVIDER_CONFIG = {
     claude: {
-        // VERIFIED: Full path is /api/organizations/{uuid}/chat_conversations/{uuid}/completion
-        // '/chat_conversations/' is specific enough — won't match analytics or auth calls
-        // '/completion' alone is too broad — other endpoints might use it
+        // Targets the Claude web UI completions stream.
+        // We match via the unique '/chat_conversations/' directory to prevent 
+        // broad collisions with generic '/completion' analytucs APIs.
         endpoints: ['/chat_conversations/'],
         sentinels: ['message_start', 'content_block_stop', 'message_delta'],
         terminator: 'message_stop',
     },
     chatgpt: {
-        // VERIFY in DevTools before first run
+        // Target definitions for ChatGPT web GUI
         endpoints: ['/backend-api/conversation'],
         sentinels: ['choices', 'delta'],
         terminator: '[DONE]',

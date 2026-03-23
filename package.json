@@ -18,6 +18,8 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "@anthropic-ai/tokenizer": "^0.0.4",
+    "js-tiktoken": "^1.0.21",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
@@ -26,6 +28,8 @@
     "@types/react-dom": "^19.2.3",
     "@wxt-dev/module-react": "^1.1.5",
     "typescript": "^5.9.3",
+    "vite-plugin-top-level-await": "^1.6.0",
+    "vite-plugin-wasm": "^3.6.0",
     "wxt": "^0.20.20"
   }
 }

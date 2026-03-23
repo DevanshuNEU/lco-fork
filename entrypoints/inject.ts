@@ -1,28 +1,59 @@
-// entrypoints/inject.ts — MAIN world fetch interceptor + Claude SSE decoder
+// entrypoints/inject.ts - Main world fetch interceptor and Claude SSE decoder
 // Runs in the page's JavaScript context (Room 1).
-// COMPLETELY SELF-CONTAINED — no imports from lib/ to avoid chrome.* contamination.
+// Note: This script is entirely self-contained. Do not import from lib/ to prevent 
+// chrome.* API references from bleeding into the unprivileged page context.
 // WXT injects this as an unlisted script via injectScript() from the content script.
 
 export default defineUnlistedScript(() => {
     (function () {
-        // ─── INLINED PROVIDER CONFIG ────────────────────────────────────────────────
-        // Source of truth is lib/platform-config.ts — kept in sync manually.
-        // Inlined to guarantee zero transitive chrome.* references in MAIN world.
-        // VERIFIED: Claude streams via /api/organizations/{uuid}/chat_conversations/{uuid}/completion
-        // '/chat_conversations/' is specific enough — won't match analytics or auth calls
-        const CLAUDE_ENDPOINTS = ['/chat_conversations/'];
-        // ─── CAPTURE PLATFORM FETCH WRAPPER ─────────────────────────────────────────
-        // On both claude.ai and chat.openai.com, fetch is already monkey-patched
-        // by DataDog/Intercom instrumentation. We save THEIR wrapper as originalFetch.
-        // Chain: our wrapper → their wrapper → native fetch.
+        // Provider Configuration (Inlined)
+        const CLAUDE_COMPLETION_SUFFIX = '/completion';
+        const CLAUDE_CONVERSATION_PATTERN = '/chat_conversations/';
+
+        // Capture the original fetch function before it is modified by platform wrappers
         const originalFetch = window.fetch;
 
-        // ─── ENDPOINT DETECTION ─────────────────────────────────────────────────────
-        function isClaudeEndpoint(url: string): boolean {
-            return CLAUDE_ENDPOINTS.some((ep) => url.includes(ep));
+        // Endpoint Detection
+        function isCompletionEndpoint(url: string): boolean {
+            return url.includes(CLAUDE_CONVERSATION_PATTERN) && url.endsWith(CLAUDE_COMPLETION_SUFFIX);
         }
 
-        // ─── CLAUDE SSE EVENT HANDLER ───────────────────────────────────────────────
+        function isConversationGetEndpoint(url: string): boolean {
+            return url.includes(CLAUDE_CONVERSATION_PATTERN) && url.includes('rendering_mode=messages');
+        }
+
+        // Token Counting Bridge
+        let _tokenIdCounter = 0;
+        const _pendingTokenRequests = new Map<number, (count: number) => void>();
+
+        window.addEventListener('message', (event) => {
+            if (event.source !== window || !event.data || event.data.type !== 'LCO_TOKEN_RES') return;
+            const { id, count } = event.data;
+            const resolve = _pendingTokenRequests.get(id);
+            if (resolve) {
+                _pendingTokenRequests.delete(id);
+                resolve(count);
+            }
+        });
+
+        async function countTokens(text: string): Promise<number> {
+            if (!text) return 0;
+            return new Promise((resolve) => {
+                const id = ++_tokenIdCounter;
+                _pendingTokenRequests.set(id, resolve);
+                window.postMessage({ type: 'LCO_TOKEN_REQ', id, text }, '*');
+                
+                // Fallback timeout to prevent memory leaks if the bridge fails
+                setTimeout(() => {
+                    if (_pendingTokenRequests.has(id)) {
+                        _pendingTokenRequests.delete(id);
+                        resolve(0);
+                    }
+                }, 5000);
+            });
+        }
+
+        // Claude SSE Event Handler
         interface HealthState {
             chunksProcessed: number;
             sawMessageStart: boolean;
@@ -30,75 +61,61 @@ export default defineUnlistedScript(() => {
             stopReason: string | null;
         }
 
-        function handleClaudeEvent(
+        async function handleClaudeEvent(
             evt: any,
             health: HealthState,
             summary: { inputTokens: number; outputTokens: number; model: string },
+            promptText: string
         ) {
             const type = evt.type;
 
-            // message_start: input tokens + cache tokens (exact from Anthropic)
             if (type === 'message_start') {
                 health.sawMessageStart = true;
-                const usage = evt.message?.usage ?? {};
-                const inputTokens = usage.input_tokens ?? 0;
-                const cacheCreate = usage.cache_creation_input_tokens ?? 0;
-                const cacheRead = usage.cache_read_input_tokens ?? 0;
-                const model = evt.message?.model ?? 'unknown';
-
-                summary.inputTokens = inputTokens;
-                summary.model = model;
-
-                console.log(
-                    `[LCO] message_start → input: ${inputTokens} tokens, ` +
-                    `cache_create: ${cacheCreate}, cache_read: ${cacheRead}, ` +
-                    `model: ${model}`,
-                );
+                
+                // Count input tokens natively using the local tokenizer proxy
+                if (promptText) {
+                    summary.inputTokens = await countTokens(promptText);
+                    console.log(`[LCO] message_start : input: ~${summary.inputTokens} tokens (local BPE)`);
+                } else {
+                    console.log(`[LCO] message_start : input: ~0 tokens (missing prompt)`);
+                }
             }
 
-            // content_block_start: note block type
             if (type === 'content_block_start') {
                 health.sawContentBlock = true;
             }
 
-            // content_block_delta: visible text OR partial tool JSON
             if (type === 'content_block_delta') {
                 const delta = evt.delta ?? {};
                 if (delta.type === 'text_delta' && delta.text) {
-                    // Log first 80 chars of text deltas to avoid flooding console
-                    const preview = delta.text.length > 80 ? delta.text.slice(0, 80) + '…' : delta.text;
-                    console.log(`[LCO] text_delta → "${preview}"`);
+                    const chunkTokens = await countTokens(delta.text);
+                    summary.outputTokens += chunkTokens;
+                    const preview = delta.text.length > 80 ? delta.text.slice(0, 80) + '...' : delta.text;
+                    console.log(`[LCO] content_block_delta : "${preview}" : ~${chunkTokens} tokens (local BPE)`);
                 }
             }
 
-            // message_delta: final output token count (exact from Anthropic)
             if (type === 'message_delta') {
                 health.stopReason = evt.delta?.stop_reason ?? null;
-                const outputTokens = evt.usage?.output_tokens ?? 0;
-                summary.outputTokens = outputTokens;
-
-                console.log(
-                    `[LCO] message_delta → output: ${outputTokens} tokens, ` +
-                    `stop_reason: ${health.stopReason}`,
-                );
+                console.log(`[LCO] message_delta : stop_reason: ${health.stopReason}`);
             }
 
-            // message_stop: stream complete confirmation
             if (type === 'message_stop') {
-                console.log('[LCO] message_stop → stream confirmed complete');
+                console.log('[LCO] message_stop : stream confirmed complete');
             }
 
-            // Error injected into stream — treat as termination
             if (type === 'error') {
                 console.error('[LCO-ERROR] Stream error event:', evt.error);
             }
         }
 
-        // ─── SSE STREAM DECODER ─────────────────────────────────────────────────────
-        async function decodeSSEStream(stream: ReadableStream<Uint8Array>) {
+        // SSE Stream Decoder
+        async function decodeSSEStream(
+            stream: ReadableStream<Uint8Array>,
+            requestModel: string,
+            promptText: string
+        ) {
             const reader = stream.getReader();
-            // MANDATORY: stream: true — without it, multi-byte UTF-8 chars split
-            // across chunk boundaries produce corrupted replacement characters.
             const decoder = new TextDecoder('utf-8');
             let buffer = '';
 
@@ -112,20 +129,19 @@ export default defineUnlistedScript(() => {
             const summary = {
                 inputTokens: 0,
                 outputTokens: 0,
-                model: 'unknown',
+                model: requestModel, 
             };
 
             let lastDataTime = Date.now();
 
-            // Watchdog — handles silent stalls and missing message_stop
+            // Watchdog interval to detect and close stalled connections
             const watchdog = setInterval(() => {
                 if (Date.now() - lastDataTime > 120_000) {
-                    // 2 min silence = dead stream
                     clearInterval(watchdog);
                     reader.cancel();
-                    console.error('[LCO-ERROR] Watchdog: stream silent for 120s — cancelled');
+                    console.error('[LCO-ERROR] Watchdog: stream silent for 120s - cancelled');
                 }
-            }, 10_000); // check every 10 seconds
+            }, 10_000);
 
             try {
                 while (true) {
@@ -133,10 +149,8 @@ export default defineUnlistedScript(() => {
                     try {
                         readResult = await reader.read();
                     } catch (err) {
-                        // Handle user clicking Claude's stop button:
-                        // Page branch gets cancelled → backpressure aborts our branch
                         if (err instanceof DOMException && err.name === 'AbortError') {
-                            console.log('[LCO] Stream aborted by user (stop button)');
+                            console.log('[LCO] Stream aborted by user via interface');
                         } else {
                             console.error('[LCO-ERROR] Stream read error:', err);
                         }
@@ -149,12 +163,10 @@ export default defineUnlistedScript(() => {
                     lastDataTime = Date.now();
                     buffer += decoder.decode(value, { stream: true });
 
-                    // Split on newlines — SSE uses \n\n between events
                     const lines = buffer.split('\n');
-                    buffer = lines.pop() ?? ''; // keep incomplete last line in buffer
+                    buffer = lines.pop() ?? '';
 
                     for (const line of lines) {
-                        // Handle both "data: {...}" and "data:{...}" (RFC violation in the wild)
                         if (!line.startsWith('data:')) continue;
                         const raw = line.slice(5).trim();
                         if (!raw || raw === '[DONE]') continue;
@@ -162,10 +174,9 @@ export default defineUnlistedScript(() => {
                         try {
                             const evt = JSON.parse(raw);
                             health.chunksProcessed++;
-                            handleClaudeEvent(evt, health, summary);
+                            await handleClaudeEvent(evt, health, summary, promptText);
                         } catch {
-                            // Malformed JSON — skip but log at debug level
-                            console.debug('[LCO] Skipped malformed JSON in SSE line');
+                            console.debug('[LCO] Skipped malformed JSON payload in SSE stream');
                         }
                     }
                 }
@@ -173,65 +184,97 @@ export default defineUnlistedScript(() => {
                 clearInterval(watchdog);
                 reader.releaseLock();
 
-                // ─── STREAM COMPLETE SUMMARY ──────────────────────────────────────────
                 console.log(
-                    `%c[LCO] ✓ Stream complete → ${summary.inputTokens} in / ${summary.outputTokens} out` +
-                    ` | model: ${summary.model}` +
+                    `%c[LCO] [Complete] model: ${summary.model}` +
+                    (summary.inputTokens > 0 ? ` | ~${summary.inputTokens} in` : '') +
+                    (summary.outputTokens > 0 ? ` | ~${summary.outputTokens} out` : '') +
                     (health.stopReason ? ` | stop: ${health.stopReason}` : ''),
                     'color: #4CAF50; font-weight: bold;',
                 );
 
-                // Health evaluation
                 if (!health.sawMessageStart && health.chunksProcessed >= 10) {
                     console.warn(
-                        '[LCO-ERROR] Health check: BROKEN — ' +
-                        `${health.chunksProcessed} chunks processed but no Claude lifecycle events detected. ` +
-                        'The SSE format may have changed.',
+                        '[LCO-ERROR] Health check failed: ' +
+                        `${health.chunksProcessed} chunks processed but missing Claude lifecycle events.`,
                     );
                 }
             }
         }
 
-        // ─── FETCH INTERCEPTOR ──────────────────────────────────────────────────────
-        const nativeFetch = originalFetch; // alias for clarity in apply calls
+        // Request Body Data Extraction
+        function extractModelAndPromptFromInit(init?: RequestInit): { model: string; prompt: string } {
+            const result = { model: 'unknown', prompt: '' };
+            if (!init?.body) return result;
+            try {
+                const bodyStr = typeof init.body === 'string'
+                    ? init.body
+                    : init.body instanceof ArrayBuffer
+                        ? new TextDecoder().decode(init.body)
+                        : null;
+                if (!bodyStr) return result;
+                const parsed = JSON.parse(bodyStr);
+                if (parsed.model) result.model = parsed.model;
+                if (parsed.prompt) result.prompt = parsed.prompt;
+                return result;
+            } catch {
+                return result;
+            }
+        }
+
+        // Post-Stream Application Probe
+        async function probeConversationResponse(response: Response) {
+            try {
+                const cloned = response.clone();
+                const data = await cloned.json();
+                const json = JSON.stringify(data);
+                const hasTokens = json.includes('token') || json.includes('usage');
+                if (!hasTokens) {
+                    // Left empty for future network-shape debugging
+                }
+            } catch (err) { }
+        }
+
+        // Intercept API Requests
+        const nativeFetch = originalFetch;
         window.fetch = async function (
             input: RequestInfo | URL,
             init?: RequestInit,
         ): Promise<Response> {
             const url = typeof input === 'string' ? input : (input as Request)?.url ?? '';
 
-            // Not a Claude endpoint — pass straight through
-            if (!isClaudeEndpoint(url)) {
-                return nativeFetch.call(this, input, init);
+            if (isCompletionEndpoint(url)) {
+                const { model, prompt } = extractModelAndPromptFromInit(init);
+                console.log(`[LCO] Intercepted completion request: ${url.slice(-80)} | model: ${model}`);
+
+                const response = await nativeFetch.call(this, input, init);
+
+                if (response.body) {
+                    const [pageStream, monitorStream] = response.body.tee();
+                    const cleanResponse = new Response(pageStream, {
+                        status: response.status,
+                        statusText: response.statusText,
+                        headers: response.headers,
+                    });
+
+                    decodeSSEStream(monitorStream, model, prompt).catch((err) => {
+                        console.error('[LCO-ERROR] SSE decoder failed:', err);
+                    });
+
+                    return cleanResponse;
+                }
+
+                return response;
             }
 
-            console.log(`[LCO] Intercepted fetch: ${url}`);
-
-            // Call real fetch — do NOT await monitoring before returning
-            const response = await nativeFetch.call(this, input, init);
-
-            if (response.body) {
-                // Split stream — Branch 1 to page, Branch 2 to us
-                const [pageStream, monitorStream] = response.body.tee();
-
-                // Build clean response for the page with Branch 1
-                const cleanResponse = new Response(pageStream, {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: response.headers,
-                });
-
-                // Fire-and-forget — never block the page
-                decodeSSEStream(monitorStream).catch((err) => {
-                    console.error('[LCO-ERROR] SSE decoder failed:', err);
-                });
-
-                return cleanResponse;
+            if (isConversationGetEndpoint(url)) {
+                const response = await nativeFetch.call(this, input, init);
+                probeConversationResponse(response).catch(() => { });
+                return response;
             }
 
-            return response;
+            return nativeFetch.call(this, input, init);
         };
 
-        console.log('[LCO] Fetch interceptor installed — watching for Claude API calls');
+        console.log('[LCO] Fetch interceptor initialized successfully.');
     })();
 });
