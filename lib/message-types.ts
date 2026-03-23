@@ -114,6 +114,7 @@ export interface SessionCost {
     totalInputTokens: number;
     totalOutputTokens: number;
     requestCount: number;
+    estimatedCost?: number;  // USD; absent when all requests used an unknown model
     updatedAt: number;
 }
 
