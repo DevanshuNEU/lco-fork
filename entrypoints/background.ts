@@ -5,6 +5,7 @@
 import { Tiktoken } from 'js-tiktoken/lite';
 import claudeJson from '@anthropic-ai/tokenizer/claude.json';
 import type { BackgroundMessage, TabState, SessionCost } from '../lib/message-types';
+import { calculateCost } from '../lib/pricing';
 
 let _tokenizer: Tiktoken | null = null;
 let _initPromise: Promise<Tiktoken> | null = null;
@@ -74,10 +75,12 @@ async function writeTabState(
   };
 
   // Only increment request count on stream completion (stopReason present)
+  const requestCost = calculateCost(inputTokens, outputTokens, model);
   const newCost: SessionCost = {
     totalInputTokens: prev.totalInputTokens + inputTokens,
     totalOutputTokens: prev.totalOutputTokens + outputTokens,
     requestCount: stopReason !== null ? prev.requestCount + 1 : prev.requestCount,
+    estimatedCost: requestCost !== null ? (prev.estimatedCost ?? 0) + requestCost : prev.estimatedCost,
     updatedAt: now,
   };
 
