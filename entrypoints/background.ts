@@ -59,7 +59,7 @@ async function writeTabState(
   const costKey = sessionCostKey(tabId);
 
   const existing = await browser.storage.session.get([costKey]);
-  const prev: SessionCost = existing[costKey] ?? {
+  const prev: SessionCost = (existing[costKey] as SessionCost | undefined) ?? {
     totalInputTokens: 0,
     totalOutputTokens: 0,
     requestCount: 0,
@@ -109,7 +109,7 @@ async function writeMessageLimit(
 ): Promise<TabState | null> {
   const stateKey = tabStateKey(tabId);
   const existing = await browser.storage.session.get([stateKey]);
-  const prev: TabState | undefined = existing[stateKey];
+  const prev = existing[stateKey] as TabState | undefined;
   if (!prev) return null;
   const updated: TabState = { ...prev, messageLimitUtilization, updatedAt: Date.now() };
   await browser.storage.session.set({ [stateKey]: updated });
