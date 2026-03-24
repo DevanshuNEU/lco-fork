@@ -345,18 +345,10 @@ export default defineUnlistedScript(() => {
             }
         }
 
-        // Post-Stream Application Probe (for future network-shape analysis)
-        async function probeConversationResponse(response: Response) {
-            try {
-                const cloned = response.clone();
-                const data = await cloned.json();
-                const json = JSON.stringify(data);
-                const hasTokens = json.includes('token') || json.includes('usage');
-                if (!hasTokens) {
-                    // Left empty for future network-shape debugging
-                }
-            } catch { }
-        }
+        // TODO(LCO-future): probeConversationResponse — inspect conversation GET
+        // response shape when Anthropic adds token usage to the REST endpoint.
+        // Currently the GET response contains no token/usage fields (verified March 2026).
+        function probeConversationResponse(_response: Response): void { /* no-op */ }
 
         // Intercept API Requests
         const nativeFetch = originalFetch;
@@ -398,7 +390,7 @@ export default defineUnlistedScript(() => {
 
             if (isConversationGetEndpoint(url)) {
                 const response = await nativeFetch.call(this, input, init);
-                probeConversationResponse(response).catch(() => { });
+                probeConversationResponse(response);
                 return response;
             }
 
