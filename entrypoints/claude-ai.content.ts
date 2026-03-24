@@ -27,8 +27,10 @@ export default defineContentScript({
         // All null until buildOverlayDOM() runs. updateOverlay() is a safe no-op until then.
         let overlayWidget: HTMLDivElement | null = null;
         let elCurrentRequest: HTMLElement | null = null;
+        let elContextRow: HTMLElement | null = null;
         let elContextFill: HTMLElement | null = null;
         let elContextLabel: HTMLElement | null = null;
+        let elLimitRow: HTMLElement | null = null;
         let elLimitFill: HTMLElement | null = null;
         let elLimitLabel: HTMLElement | null = null;
         let elSession: HTMLElement | null = null;
@@ -80,19 +82,25 @@ export default defineContentScript({
                     `~${fmt(inputTokens)} in · ~${fmt(outputTokens)} out · ${fmtCost(cost)}`;
             }
 
-            if (elContextFill && elContextLabel) {
-                const pct = state.contextPct !== null ? Math.min(state.contextPct, 100) : 0;
-                elContextFill.style.width = `${pct}%`;
-                elContextLabel.textContent = state.contextPct !== null
-                    ? `${pct.toFixed(1)}% ctx`
-                    : '—% ctx';
-                elContextFill.classList.toggle('lco-streaming', state.streaming);
+            if (elContextRow && elContextFill && elContextLabel) {
+                const visible = state.contextPct !== null && state.contextPct > 0.1;
+                elContextRow.style.display = visible ? '' : 'none';
+                if (visible) {
+                    const pct = Math.min(state.contextPct!, 100);
+                    elContextFill.style.width = `${pct}%`;
+                    elContextLabel.textContent = `${pct.toFixed(1)}% ctx`;
+                    elContextFill.classList.toggle('lco-streaming', state.streaming);
+                }
             }
 
-            if (elLimitFill && elLimitLabel && state.messageLimitUtilization !== null) {
-                const pct = Math.min(state.messageLimitUtilization * 100, 100);
-                elLimitFill.style.width = `${pct}%`;
-                elLimitLabel.textContent = `${pct.toFixed(0)}% limit`;
+            if (elLimitRow && elLimitFill && elLimitLabel) {
+                const visible = state.messageLimitUtilization !== null;
+                elLimitRow.style.display = visible ? '' : 'none';
+                if (visible) {
+                    const pct = Math.min(state.messageLimitUtilization! * 100, 100);
+                    elLimitFill.style.width = `${pct}%`;
+                    elLimitLabel.textContent = `${pct.toFixed(0)}% limit`;
+                }
             }
 
             if (elSession) {
@@ -166,6 +174,8 @@ export default defineContentScript({
             // Context window bar
             const ctxRow = document.createElement('div');
             ctxRow.className = 'lco-bar-row';
+            ctxRow.style.display = 'none'; // hidden until contextPct > 0.1%
+            elContextRow = ctxRow;
             const ctxTrack = document.createElement('div');
             ctxTrack.className = 'lco-bar-track';
             const ctxFill = document.createElement('div');
@@ -184,6 +194,8 @@ export default defineContentScript({
             // Message limit bar
             const limitRow = document.createElement('div');
             limitRow.className = 'lco-bar-row';
+            limitRow.style.display = 'none'; // hidden until first MESSAGE_LIMIT_UPDATE
+            elLimitRow = limitRow;
             const limitTrack = document.createElement('div');
             limitTrack.className = 'lco-bar-track lco-bar-track--warn';
             const limitFill = document.createElement('div');
