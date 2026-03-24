@@ -2,7 +2,6 @@ import { defineConfig } from 'wxt';
 
 // Reference: https://wxt.dev/api/config.html
 export default defineConfig({
-  modules: ['@wxt-dev/module-react'],
   webExt: {
     chromiumArgs: ['--user-data-dir=./.wxt/chrome-data'],
     // Persistent profile: Retains claude.ai cookies across dev restarts.
