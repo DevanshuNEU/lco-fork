@@ -72,12 +72,19 @@ Each concern gets its own module. When adding a feature, ask: "Which layer does 
 
 ### Workflow
 - Tests: `bun run test`.
-- Typecheck: `bun run typecheck`.
+- Typecheck: `bun run compile`.
 - Build: `bun run build`.
 - Commits: `type(scope): description [LCO-XXX]`. No Co-Authored-By lines.
-- Branches: `feat/lco-XX-short-description`.
+- Branches: `feat/lco-XX-short-description`. Always branch off `main`.
 - One PR at a time. Open in browser after creating.
-- Always run typecheck, test, and build before declaring something done.
+- Always run compile, test, and build before declaring something done.
+
+### PR Flow
+1. Create feature branch: `git checkout -b feat/lco-XX-short-description`
+2. Commit work, then push: `git push origin feat/lco-XX-short-description`
+3. Open PR targeting upstream: `gh pr create --repo OpenCodeIntel/lco --head DevanshuNEU:<branch>`
+- Never push directly to upstream. Never create PRs targeting the fork.
+- User handles fork sync and `git pull origin main` between issues.
 
 ### Tracking
 - All issue status lives in Linear (team: LCO). Never duplicate status in this file.
