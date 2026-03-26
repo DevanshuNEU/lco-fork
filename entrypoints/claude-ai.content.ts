@@ -399,6 +399,10 @@ async function initializeMonitoring(): Promise<void> {
                 contextPct: ctxSize > 0
                     ? (msg.inputTokens + msg.outputTokens) / ctxSize * 100
                     : state.contextPct,
+                // A new stream arriving means the bridge is working. Clear any
+                // previous health warning immediately rather than waiting for
+                // HEALTH_RECOVERED, which fires asynchronously after stream end.
+                healthBroken: null,
                 streaming: true,
             };
             updateOverlay();
