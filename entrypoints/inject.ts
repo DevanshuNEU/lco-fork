@@ -68,16 +68,23 @@ export default defineUnlistedScript(() => {
             return url.includes(INJECT_CONFIG.endpointIncludes) && terminates;
         }
 
+        // Tracks whether the most recent stream ended with a health failure.
+        // Persists across stream calls in this page load so HEALTH_RECOVERED
+        // can be fired the next time a stream completes cleanly.
+        let _lastStreamFailed = false;
+
         // Secure Bridge: postMessage with LCO_V1 namespace + session token
         // Messages are batched every 200ms to avoid saturating the bridge.
         // Never uses '*' as targetOrigin; always scoped to the current origin.
         function postSecureBatch(payload: {
-            type: 'TOKEN_BATCH' | 'STREAM_COMPLETE' | 'HEALTH_BROKEN' | 'MESSAGE_LIMIT_UPDATE';
+            type: 'TOKEN_BATCH' | 'STREAM_COMPLETE' | 'HEALTH_BROKEN' | 'HEALTH_RECOVERED' | 'MESSAGE_LIMIT_UPDATE';
             inputTokens?: number;
             outputTokens?: number;
             model?: string;
             stopReason?: string | null;
+            reason?: string;
             message?: string;
+            recoveredAt?: number;
             messageLimitUtilization?: number;
         }) {
             window.postMessage(
@@ -129,6 +136,7 @@ export default defineUnlistedScript(() => {
             chunksProcessed: number;
             sawMessageStart: boolean;
             sawContentBlock: boolean;
+            sawStreamEnd: boolean;
             stopReason: string | null;
         }
 
@@ -174,6 +182,7 @@ export default defineUnlistedScript(() => {
             }
 
             if (type === events.streamEnd) {
+                health.sawStreamEnd = true;
                 console.log(`[LCO] ${events.streamEnd} : stream confirmed complete`);
             }
 
@@ -196,8 +205,12 @@ export default defineUnlistedScript(() => {
                 chunksProcessed: 0,
                 sawMessageStart: false,
                 sawContentBlock: false,
+                sawStreamEnd: false,
                 stopReason: null,
             };
+
+            // Guards against firing multiple HEALTH_BROKEN events for a single stream.
+            let healthBrokenFired = false;
 
             const summary = {
                 inputTokens: 0,
@@ -230,6 +243,14 @@ export default defineUnlistedScript(() => {
             const watchdog = setInterval(() => {
                 if (Date.now() - lastDataTime > 120_000) {
                     clearInterval(watchdog);
+                    if (!healthBrokenFired) {
+                        healthBrokenFired = true;
+                        postSecureBatch({
+                            type: 'HEALTH_BROKEN',
+                            reason: 'stream_timeout',
+                            message: 'Stream silent for 120s - connection may be broken.',
+                        });
+                    }
                     reader.cancel();
                     console.error('[LCO-ERROR] Watchdog: stream silent for 120s - cancelled');
                 }
@@ -352,16 +373,38 @@ export default defineUnlistedScript(() => {
                     'color: #4CAF50; font-weight: bold;',
                 );
 
-                if (!health.sawMessageStart && health.chunksProcessed >= 10) {
-                    // Surface a health broken event so the UI can show a warning
+                if (!healthBrokenFired) {
+                    if (!health.sawMessageStart && health.chunksProcessed >= 10) {
+                        healthBrokenFired = true;
+                        postSecureBatch({
+                            type: 'HEALTH_BROKEN',
+                            reason: 'missing_sentinel',
+                            message: `${health.chunksProcessed} chunks processed but stream_start event never arrived.`,
+                        });
+                        console.warn(
+                            '[LCO-ERROR] Health check failed: ' +
+                            `${health.chunksProcessed} chunks processed but stream_start event never arrived.`,
+                        );
+                    } else if (health.sawMessageStart && !health.sawStreamEnd) {
+                        healthBrokenFired = true;
+                        postSecureBatch({
+                            type: 'HEALTH_BROKEN',
+                            reason: 'incomplete_lifecycle',
+                            message: 'Stream started but stream_end event never arrived.',
+                        });
+                        console.warn('[LCO-ERROR] Health check failed: stream started but stream_end event never arrived.');
+                    }
+                }
+
+                if (healthBrokenFired) {
+                    _lastStreamFailed = true;
+                } else if (_lastStreamFailed) {
+                    _lastStreamFailed = false;
                     postSecureBatch({
-                        type: 'HEALTH_BROKEN',
-                        message: `${health.chunksProcessed} chunks processed but missing ${PLATFORM} lifecycle events.`,
+                        type: 'HEALTH_RECOVERED',
+                        recoveredAt: Date.now(),
                     });
-                    console.warn(
-                        '[LCO-ERROR] Health check failed: ' +
-                        `${health.chunksProcessed} chunks processed but missing ${PLATFORM} lifecycle events.`,
-                    );
+                    console.log('[LCO] Stream health recovered.');
                 }
             }
         }

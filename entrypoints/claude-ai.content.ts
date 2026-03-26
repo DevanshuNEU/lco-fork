@@ -399,6 +399,10 @@ async function initializeMonitoring(): Promise<void> {
                 contextPct: ctxSize > 0
                     ? (msg.inputTokens + msg.outputTokens) / ctxSize * 100
                     : state.contextPct,
+                // A new stream arriving means the bridge is working. Clear any
+                // previous health warning immediately rather than waiting for
+                // HEALTH_RECOVERED, which fires asynchronously after stream end.
+                healthBroken: null,
                 streaming: true,
             };
             updateOverlay();
@@ -459,6 +463,11 @@ async function initializeMonitoring(): Promise<void> {
         if (msg.type === 'HEALTH_BROKEN') {
             console.warn('[LCO] Health check broken:', msg.message);
             state = { ...state, healthBroken: msg.message };
+            updateOverlay();
+        }
+
+        if (msg.type === 'HEALTH_RECOVERED') {
+            state = { ...state, healthBroken: null };
             updateOverlay();
         }
 
@@ -561,11 +570,13 @@ function isValidBridgeSchema(data: any): boolean {
     if (typeof data !== 'object' || data === null) return false;
     if (data.namespace !== LCO_NAMESPACE) return false;
     if (typeof data.token !== 'string' || data.token.length === 0) return false;
-    if (!['TOKEN_BATCH', 'STREAM_COMPLETE', 'HEALTH_BROKEN', 'MESSAGE_LIMIT_UPDATE'].includes(data.type)) return false;
+    if (!['TOKEN_BATCH', 'STREAM_COMPLETE', 'HEALTH_BROKEN', 'HEALTH_RECOVERED', 'MESSAGE_LIMIT_UPDATE'].includes(data.type)) return false;
     if (data.type === 'MESSAGE_LIMIT_UPDATE') {
         if (typeof data.messageLimitUtilization !== 'number') return false;
     } else if (data.type === 'HEALTH_BROKEN') {
         if (typeof data.message !== 'string') return false;
+    } else if (data.type === 'HEALTH_RECOVERED') {
+        if (typeof data.recoveredAt !== 'number') return false;
     } else {
         if (typeof data.inputTokens !== 'number') return false;
         if (typeof data.outputTokens !== 'number') return false;

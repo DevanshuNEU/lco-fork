@@ -32,13 +32,29 @@ export interface StreamCompletePayload {
     stopReason: string | null;
 }
 
+/** Standardized reasons for a health check failure. */
+export type HealthBrokenReason =
+    | 'missing_sentinel'      // 10+ chunks processed but stream_start event never arrived
+    | 'stream_timeout'        // watchdog detected 120s of silence on an active stream
+    | 'incomplete_lifecycle'; // stream_start arrived but stream_end never did
+
 /** Fired if a health check failure is detected mid-stream */
 export interface StreamHealthBrokenPayload {
     namespace: typeof LCO_NAMESPACE;
     type: 'HEALTH_BROKEN';
     token: string;
     platform: string;
+    reason: HealthBrokenReason;
     message: string;
+}
+
+/** Fired when a stream completes cleanly after a previous HEALTH_BROKEN */
+export interface StreamHealthRecoveredPayload {
+    namespace: typeof LCO_NAMESPACE;
+    type: 'HEALTH_RECOVERED';
+    token: string;
+    platform: string;
+    recoveredAt: number;
 }
 
 /** Fired when free/Pro usage cap details are received */
@@ -51,7 +67,7 @@ export interface MessageLimitPayload {
 }
 
 /** Union of all valid bridge message types */
-export type LcoBridgeMessage = TokenBatchPayload | StreamCompletePayload | StreamHealthBrokenPayload | MessageLimitPayload;
+export type LcoBridgeMessage = TokenBatchPayload | StreamCompletePayload | StreamHealthBrokenPayload | StreamHealthRecoveredPayload | MessageLimitPayload;
 
 // Tab Storage Schema (chrome.storage.session)
 
