@@ -74,7 +74,7 @@ export function createOverlay(): OverlayHandle {
         rowLast.className = 'lco-row';
         const lblLast = document.createElement('span');
         lblLast.className = 'lco-label';
-        lblLast.textContent = 'last';
+        lblLast.textContent = 'this reply';
         const valLast = document.createElement('span');
         valLast.className = 'lco-value lco-accent';
         valLast.textContent = '—';
@@ -137,7 +137,7 @@ export function createOverlay(): OverlayHandle {
         elSessionRow = rowSession;
         const lblSession = document.createElement('span');
         lblSession.className = 'lco-label';
-        lblSession.textContent = 'session';
+        lblSession.textContent = 'total';
         const valSession = document.createElement('span');
         valSession.className = 'lco-value';
         valSession.textContent = '—';

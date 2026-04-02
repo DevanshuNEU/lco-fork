@@ -4,36 +4,38 @@
 
 export const OVERLAY_CSS = `
 :host {
-  --lco-bg:           rgba(13, 13, 18, 0.82);
-  --lco-bg-hover:     rgba(13, 13, 18, 0.94);
-  --lco-text:         #e4e4e7;
-  --lco-muted:        #52525b;
-  --lco-accent:       #a78bfa;
-  --lco-bar-fill:     #7c3aed;
-  --lco-bar-glow:     rgba(124, 58, 237, 0.45);
-  --lco-bar-bg:       rgba(124, 58, 237, 0.14);
+  /* Matches claude.ai dark panel color (~#252527). Solid, no frosted glass. */
+  --lco-bg:           #252528;
+  --lco-bg-hover:     #2c2c30;
+  --lco-text:         #d4d4d8;
+  --lco-muted:        #71717a;
+  /* Warm orange — echoes Claude's own coral brand color, not purple. */
+  --lco-accent:       #d4956a;
+  --lco-bar-fill:     #c17a4e;
+  --lco-bar-glow:     rgba(193, 122, 78, 0.28);
+  --lco-bar-bg:       rgba(193, 122, 78, 0.12);
   --lco-warn-fill:    #f59e0b;
-  --lco-warn-glow:    rgba(245, 158, 11, 0.35);
-  --lco-warn-bg:      rgba(245, 158, 11, 0.12);
-  --lco-border:       rgba(167, 139, 250, 0.12);
-  --lco-border-hover: rgba(167, 139, 250, 0.3);
+  --lco-warn-glow:    rgba(245, 158, 11, 0.22);
+  --lco-warn-bg:      rgba(245, 158, 11, 0.09);
+  --lco-border:       rgba(255, 255, 255, 0.06);
+  --lco-border-hover: rgba(255, 255, 255, 0.12);
 }
 
 @media (prefers-color-scheme: light) {
   :host {
-    --lco-bg:           rgba(255, 255, 255, 0.80);
-    --lco-bg-hover:     rgba(255, 255, 255, 0.96);
-    --lco-text:         #18181b;
+    --lco-bg:           #ffffff;
+    --lco-bg-hover:     #f4f4f5;
+    --lco-text:         #27272a;
     --lco-muted:        #a1a1aa;
-    --lco-accent:       #7c3aed;
-    --lco-bar-fill:     #7c3aed;
-    --lco-bar-glow:     rgba(124, 58, 237, 0.25);
-    --lco-bar-bg:       rgba(124, 58, 237, 0.10);
+    --lco-accent:       #b36a3a;
+    --lco-bar-fill:     #b36a3a;
+    --lco-bar-glow:     rgba(179, 106, 58, 0.20);
+    --lco-bar-bg:       rgba(179, 106, 58, 0.10);
     --lco-warn-fill:    #d97706;
-    --lco-warn-glow:    rgba(217, 119, 6, 0.25);
-    --lco-warn-bg:      rgba(217, 119, 6, 0.10);
-    --lco-border:       rgba(124, 58, 237, 0.14);
-    --lco-border-hover: rgba(124, 58, 237, 0.32);
+    --lco-warn-glow:    rgba(217, 119, 6, 0.20);
+    --lco-warn-bg:      rgba(217, 119, 6, 0.08);
+    --lco-border:       rgba(0, 0, 0, 0.07);
+    --lco-border-hover: rgba(0, 0, 0, 0.14);
   }
 }
 
@@ -49,7 +51,7 @@ export const OVERLAY_CSS = `
 
 .lco-widget {
   position: fixed;
-  bottom: 16px;
+  bottom: 88px;
   right: 16px;
   z-index: 2147483647;
   min-width: 210px;
@@ -57,29 +59,24 @@ export const OVERLAY_CSS = `
   padding: 8px 12px;
   background: var(--lco-bg);
   color: var(--lco-text);
-  border-radius: 10px;
-  font-family: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  border-radius: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   font-size: 11px;
   line-height: 1.65;
   box-shadow:
     0 0 0 1px var(--lco-border),
-    0 8px 32px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(14px) saturate(1.8);
-  -webkit-backdrop-filter: blur(14px) saturate(1.8);
+    0 8px 24px rgba(0, 0, 0, 0.35);
   animation: lco-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transition: box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease;
+  transition: box-shadow 0.18s ease, background 0.18s ease;
   cursor: default;
   user-select: none;
 }
 
 .lco-widget:hover {
-  transform: scale(1.015);
   background: var(--lco-bg-hover);
   box-shadow:
     0 0 0 1px var(--lco-border-hover),
-    0 12px 40px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    0 12px 32px rgba(0, 0, 0, 0.45);
 }
 
 .lco-widget.lco-collapsed {
@@ -127,9 +124,7 @@ export const OVERLAY_CSS = `
 }
 
 .lco-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.09em;
+  font-size: 10px;
   color: var(--lco-muted);
   flex-shrink: 0;
 }
@@ -162,7 +157,7 @@ export const OVERLAY_CSS = `
   flex: 1;
   height: 3px;
   background: var(--lco-bar-bg);
-  border-radius: 2px;
+  border-radius: 99px;
   overflow: hidden;
 }
 
@@ -173,7 +168,7 @@ export const OVERLAY_CSS = `
 .lco-bar-fill {
   height: 100%;
   background: var(--lco-bar-fill);
-  border-radius: 2px;
+  border-radius: 99px;
   box-shadow: 0 0 6px var(--lco-bar-glow);
   transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
