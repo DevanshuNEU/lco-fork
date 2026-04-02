@@ -9,6 +9,9 @@ import { INITIAL_STATE, applyTokenBatch, applyStreamComplete, applyStorageRespon
 import { createOverlay } from '../ui/overlay';
 import { showEnableBanner } from '../ui/enable-banner';
 import { ClaudeAdapter } from '../lib/adapters/claude';
+import { analyzeContext, shouldDismiss, signalKey } from '../lib/context-intelligence';
+import type { ConversationState, ContextSignal } from '../lib/context-intelligence';
+import { getContextWindowSize } from '../lib/pricing';
 
 export default defineContentScript({
     matches: ['https://claude.ai/*'],
@@ -24,10 +27,25 @@ export default defineContentScript({
     },
 });
 
+const SEVERITY_RANK: Record<string, number> = { critical: 3, warning: 2, info: 1 };
+
+function pickTopSignal(signals: ContextSignal[]): ContextSignal | null {
+    if (signals.length === 0) return null;
+    return signals.reduce((best, s) =>
+        (SEVERITY_RANK[s.severity] ?? 0) > (SEVERITY_RANK[best.severity] ?? 0) ? s : best,
+    );
+}
+
+function freshConvState(): ConversationState {
+    return { turnCount: 0, contextPct: 0, contextHistory: [], model: '', contextWindow: 200000 };
+}
+
 async function initializeMonitoring(): Promise<void> {
     const sessionToken = crypto.randomUUID();
     const overlay = createOverlay();
     let state = { ...INITIAL_STATE };
+    let convState = freshConvState();
+    let dismissed = new Set<string>();
 
     // 5-layer message bridge: Main World (inject.js) → Service Worker
     // Registered synchronously before any await so no events are dropped
@@ -58,6 +76,22 @@ async function initializeMonitoring(): Promise<void> {
         if (msg.type === 'STREAM_COMPLETE') {
             state = applyStreamComplete(state, msg);
             overlay.render(state);
+
+            // Update conversation state and evaluate signals after each complete turn.
+            convState = {
+                turnCount: convState.turnCount + 1,
+                contextPct: state.contextPct ?? 0,
+                contextHistory: [...convState.contextHistory, state.contextPct ?? 0],
+                model: msg.model,
+                contextWindow: getContextWindowSize(msg.model) || 200000,
+            };
+            const active = analyzeContext(convState).filter(s => !shouldDismiss(s, dismissed));
+            const top = pickTopSignal(active);
+            if (top) {
+                overlay.showNudge(top, () => { dismissed.add(signalKey(top)); });
+            } else {
+                overlay.hideNudge();
+            }
 
             browser.runtime.sendMessage({
                 type: 'STORE_TOKEN_BATCH',
@@ -141,12 +175,15 @@ async function initializeMonitoring(): Promise<void> {
     const shadow = host.attachShadow({ mode: 'closed' });
     overlay.mount(shadow);
 
-    // Reset overlay on SPA navigation (Navigation API, Chrome 102+)
+    // Reset overlay, conversation state, and dismissed nudges on SPA navigation (Chrome 102+).
     if ('navigation' in window) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).navigation.addEventListener('navigatesuccess', () => {
             state = { ...INITIAL_STATE };
+            convState = freshConvState();
+            dismissed = new Set();
             overlay.render(state);
+            overlay.hideNudge();
         });
     }
 }

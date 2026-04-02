@@ -192,6 +192,56 @@ export const OVERLAY_CSS = `
   text-align: right;
 }
 
+/* ── Nudge ── */
+
+@keyframes lco-nudge-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes lco-nudge-out {
+  from { opacity: 1; transform: translateY(0);    }
+  to   { opacity: 0; transform: translateY(-4px); }
+}
+
+.lco-nudge {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  animation: lco-nudge-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.lco-nudge--info     { background: rgba(99,  179, 237, 0.09); border-left: 2px solid #63b3ed; }
+.lco-nudge--warning  { background: rgba(245, 158,  11, 0.11); border-left: 2px solid #f59e0b; }
+.lco-nudge--critical { background: rgba(239,  68,  68, 0.11); border-left: 2px solid #ef4444; }
+
+.lco-nudge--exiting {
+  animation: lco-nudge-out 0.2s ease forwards;
+}
+
+.lco-nudge-msg {
+  flex: 1;
+  color: var(--lco-text);
+}
+
+.lco-nudge-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--lco-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.lco-nudge-dismiss:hover { color: var(--lco-text); }
+
 /* ── Health warning ── */
 
 .lco-health {
@@ -209,5 +259,7 @@ export const OVERLAY_CSS = `
   .lco-widget:hover         { transform: none; }
   .lco-bar-fill             { transition: none; }
   .lco-bar-fill.lco-streaming { animation: none; }
+  .lco-nudge,
+  .lco-nudge--exiting       { animation: none; }
 }
 `;
