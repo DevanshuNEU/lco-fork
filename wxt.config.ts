@@ -9,7 +9,9 @@ export default defineConfig({
   },
   manifest: {
     name: 'Local Context Optimizer',
-    description: 'Real-time token counting and cost tracking for AI platforms',
+    // 132-char limit for CWS short description.
+    description: 'See token count, cost, and context usage live on claude.ai. All counting happens locally — no data ever leaves your browser.',
+    homepage_url: 'https://lco.opencodeintel.com',
     permissions: ['storage', 'tabs', 'scripting', 'alarms'],
     content_security_policy: {
       extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
