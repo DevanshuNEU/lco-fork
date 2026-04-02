@@ -6,10 +6,14 @@
 
 import { OVERLAY_CSS } from './overlay-styles';
 import type { OverlayState } from '../lib/overlay-state';
+import type { ContextSignal } from '../lib/context-intelligence';
 
 export interface OverlayHandle {
     mount(shadow: ShadowRoot): void;
     render(state: OverlayState): void;
+    // signal: the highest-severity active signal. onDismiss: called when user clicks X.
+    showNudge(signal: ContextSignal, onDismiss: () => void): void;
+    hideNudge(): void;
 }
 
 function fmt(n: number): string {
@@ -35,8 +39,12 @@ export function createOverlay(): OverlayHandle {
     let elDivider: HTMLElement | null = null;
     let elSessionRow: HTMLElement | null = null;
     let elSession: HTMLElement | null = null;
+    let elNudge: HTMLElement | null = null;
+    let elNudgeMsg: HTMLElement | null = null;
+    let elNudgeDismiss: HTMLButtonElement | null = null;
     let elHealth: HTMLElement | null = null;
     let elCostMini: HTMLElement | null = null;
+    let nudgeHideTimer: ReturnType<typeof setTimeout> | null = null;
 
     function mount(shadow: ShadowRoot): void {
         const style = document.createElement('style');
@@ -146,6 +154,22 @@ export function createOverlay(): OverlayHandle {
         rowSession.appendChild(valSession);
         body.appendChild(rowSession);
 
+        // Nudge — hidden by default, shown by showNudge()
+        const nudge = document.createElement('div');
+        nudge.style.display = 'none';
+        elNudge = nudge;
+        const nudgeMsg = document.createElement('span');
+        nudgeMsg.className = 'lco-nudge-msg';
+        elNudgeMsg = nudgeMsg;
+        const nudgeDismiss = document.createElement('button');
+        nudgeDismiss.className = 'lco-nudge-dismiss';
+        nudgeDismiss.setAttribute('aria-label', 'Dismiss');
+        nudgeDismiss.textContent = '×';
+        elNudgeDismiss = nudgeDismiss;
+        nudge.appendChild(nudgeMsg);
+        nudge.appendChild(nudgeDismiss);
+        body.appendChild(nudge);
+
         // Health warning — hidden by default
         const health = document.createElement('div');
         health.className = 'lco-health';
@@ -225,5 +249,42 @@ export function createOverlay(): OverlayHandle {
         }
     }
 
-    return { mount, render };
+    function showNudge(signal: ContextSignal, onDismiss: () => void): void {
+        if (!elNudge || !elNudgeMsg || !elNudgeDismiss) return;
+
+        // Cancel any in-progress hide animation before showing new content.
+        if (nudgeHideTimer !== null) {
+            clearTimeout(nudgeHideTimer);
+            nudgeHideTimer = null;
+        }
+
+        elNudge.className = `lco-nudge lco-nudge--${signal.severity}`;
+        elNudgeMsg.textContent = signal.message;
+        elNudgeDismiss.style.display = signal.dismissible ? '' : 'none';
+
+        // Replace dismiss listener with a fresh one bound to the current signal.
+        const freshDismiss = elNudgeDismiss.cloneNode(true) as HTMLButtonElement;
+        elNudgeDismiss.replaceWith(freshDismiss);
+        elNudgeDismiss = freshDismiss;
+        elNudgeDismiss.addEventListener('click', () => {
+            onDismiss();
+            hideNudge();
+        }, { once: true });
+
+        elNudge.style.display = '';
+    }
+
+    function hideNudge(): void {
+        if (!elNudge) return;
+        elNudge.classList.add('lco-nudge--exiting');
+        nudgeHideTimer = setTimeout(() => {
+            if (elNudge) {
+                elNudge.style.display = 'none';
+                elNudge.classList.remove('lco-nudge--exiting');
+            }
+            nudgeHideTimer = null;
+        }, 200);
+    }
+
+    return { mount, render, showNudge, hideNudge };
 }
