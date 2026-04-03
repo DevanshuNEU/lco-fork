@@ -17,6 +17,30 @@ export interface TurnRecord {
     completedAt: number;
 }
 
+/**
+ * Incremental lossy summary of a conversation's content.
+ * Built from the first line of each user prompt as the conversation progresses.
+ * Works for any conversation topic: code, writing, research, casual.
+ * The original prompt text is processed in memory and discarded; only these
+ * derived fields persist.
+ */
+export interface ConversationDNA {
+    /** First prompt's first meaningful line. What started this conversation. */
+    subject: string;
+    /** Latest prompt's first meaningful line. Where we left off. */
+    lastContext: string;
+    /** First meaningful line of each user prompt, newest first. Max 20. */
+    hints: string[];
+}
+
+export const MAX_DNA_HINTS = 20;
+
+export const EMPTY_DNA: Readonly<ConversationDNA> = {
+    subject: '',
+    lastContext: '',
+    hints: [],
+};
+
 export interface ConversationRecord {
     id: string;
     startedAt: number;
@@ -31,6 +55,8 @@ export interface ConversationRecord {
     estimatedCost: number | null;
     /** Per-turn metadata, oldest first. Capped at MAX_TURNS_PER_RECORD. */
     turns: TurnRecord[];
+    /** Incremental content summary. Updated on every turn. */
+    dna: ConversationDNA;
     _v: 1;
 }
 
@@ -173,6 +199,43 @@ function weekMondayFromId(weekId: string): string {
     return todayDateString(mondayWeek1.getTime());
 }
 
+/**
+ * Extract the first meaningful line from a user prompt.
+ * Skips greetings, empty lines, and very short fragments.
+ * Returns the line truncated to MAX_HINT_CHARS, or empty string if nothing useful found.
+ * This runs in inject.ts (inlined) and is also exported here for testing.
+ */
+export const MAX_HINT_CHARS = 120;
+
+// Word boundary (\b) prevents "no" from matching "Now", "hi" from matching "His", etc.
+// "Please" is intentionally excluded: "Please review..." is a real request, not filler.
+const SKIP_PATTERNS = /^(hey|hi|hello|thanks|thank you|ok|okay|sure|yes|no|great|awesome|perfect|cool|nice|got it|sounds good)\b/i;
+
+export function extractTopicHint(promptText: string): string {
+    if (!promptText) return '';
+    const lines = promptText.split('\n');
+    let inCodeBlock = false;
+    for (const raw of lines) {
+        const line = raw.trim();
+        if (line.startsWith('```')) {
+            inCodeBlock = !inCodeBlock;
+            continue;
+        }
+        if (inCodeBlock) continue;                   // Skip lines inside code blocks
+        if (line.length < 10) continue;              // Too short to be meaningful
+        if (SKIP_PATTERNS.test(line)) continue;      // Greeting or filler
+        return line.length > MAX_HINT_CHARS ? line.slice(0, MAX_HINT_CHARS) + '...' : line;
+    }
+    // Fallback: return the first non-empty line if nothing passed the filter.
+    for (const raw of lines) {
+        const line = raw.trim();
+        if (line.length > 0 && !line.startsWith('```')) {
+            return line.length > MAX_HINT_CHARS ? line.slice(0, MAX_HINT_CHARS) + '...' : line;
+        }
+    }
+    return '';
+}
+
 // ── Index helpers ─────────────────────────────────────────────────────────────
 
 async function readIndex(indexKey: string): Promise<string[]> {
@@ -212,6 +275,7 @@ export async function getConversation(id: string): Promise<ConversationRecord | 
 export async function recordTurn(
     conversationId: string,
     turn: Omit<TurnRecord, 'turnNumber'>,
+    topicHint?: string,
 ): Promise<ConversationRecord> {
     const key = CONV_PREFIX + conversationId;
     const existing = await getConversation(conversationId);
@@ -230,6 +294,13 @@ export async function recordTurn(
         const addedCost = turn.cost !== null ? turn.cost : 0;
         const prevCost = existing.estimatedCost;
 
+        // Update DNA with the new topic hint (if provided and non-empty).
+        const dna = { ...existing.dna };
+        if (topicHint) {
+            dna.lastContext = topicHint;
+            dna.hints = [topicHint, ...dna.hints].slice(0, MAX_DNA_HINTS);
+        }
+
         const updated: ConversationRecord = {
             ...existing,
             lastActiveAt: now,
@@ -243,6 +314,7 @@ export async function recordTurn(
                 ? (prevCost ?? 0) + addedCost
                 : null,
             turns: updatedTurns,
+            dna,
         };
 
         await store().set({ [key]: updated });
@@ -250,6 +322,12 @@ export async function recordTurn(
     }
 
     // New conversation.
+    const dna: ConversationDNA = {
+        subject: topicHint ?? '',
+        lastContext: topicHint ?? '',
+        hints: topicHint ? [topicHint] : [],
+    };
+
     const record: ConversationRecord = {
         id: conversationId,
         startedAt: now,
@@ -263,6 +341,7 @@ export async function recordTurn(
         model: turn.model,
         estimatedCost: turn.cost,
         turns: [{ ...turn, turnNumber: 1 }],
+        dna,
         _v: 1,
     };
 

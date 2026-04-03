@@ -86,6 +86,7 @@ export default defineUnlistedScript(() => {
             message?: string;
             recoveredAt?: number;
             messageLimitUtilization?: number;
+            topicHint?: string;
         }) {
             window.postMessage(
                 {
@@ -356,6 +357,29 @@ export default defineUnlistedScript(() => {
                 if (inputCount > 0) summary.inputTokens = inputCount;
                 if (outputCount > 0) summary.outputTokens = outputCount;
 
+                // Extract topic hint from the user's prompt for Conversation DNA.
+                // Inlined here because inject.ts cannot import from lib/.
+                const topicHint = (function extractHint(text: string): string {
+                    if (!text) return '';
+                    const MAX = 120;
+                    const SKIP = /^(hey|hi|hello|thanks|thank you|ok|okay|sure|yes|no|great|awesome|perfect|cool|nice|got it|sounds good)\b/i;
+                    const lines = text.split('\n');
+                    let inCode = false;
+                    for (const raw of lines) {
+                        const ln = raw.trim();
+                        if (ln.startsWith('```')) { inCode = !inCode; continue; }
+                        if (inCode) continue;
+                        if (ln.length < 10) continue;
+                        if (SKIP.test(ln)) continue;
+                        return ln.length > MAX ? ln.slice(0, MAX) + '...' : ln;
+                    }
+                    for (const raw of lines) {
+                        const ln = raw.trim();
+                        if (ln.length > 0 && !ln.startsWith('```')) return ln.length > MAX ? ln.slice(0, MAX) + '...' : ln;
+                    }
+                    return '';
+                })(promptText);
+
                 // Send final complete event to the content script bridge
                 postSecureBatch({
                     type: 'STREAM_COMPLETE',
@@ -363,6 +387,7 @@ export default defineUnlistedScript(() => {
                     outputTokens: summary.outputTokens,
                     model: summary.model,
                     stopReason: health.stopReason,
+                    topicHint,
                 });
 
                 console.log(

@@ -102,6 +102,8 @@ async function initializeMonitoring(): Promise<void> {
             }
 
             // Persist turn to conversation history in chrome.storage.local.
+            // topicHint (first meaningful line of user prompt) flows from inject.ts
+            // through the bridge for Conversation DNA.
             if (currentConversationId) {
                 browser.runtime.sendMessage({
                     type: 'RECORD_TURN',
@@ -111,6 +113,7 @@ async function initializeMonitoring(): Promise<void> {
                     model: msg.model,
                     contextPct: state.contextPct ?? 0,
                     cost: calculateCost(msg.inputTokens, msg.outputTokens, msg.model),
+                    topicHint: msg.topicHint,
                 } satisfies RecordTurnMessage).catch((err) => {
                     console.error('[LCO-ERROR] Failed to record conversation turn:', err);
                 });

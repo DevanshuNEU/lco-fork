@@ -30,6 +30,8 @@ export interface StreamCompletePayload {
     outputTokens: number;
     model: string;
     stopReason: string | null;
+    /** First meaningful line of the user's prompt, for Conversation DNA. */
+    topicHint?: string;
 }
 
 /** Standardized reasons for a health check failure. */
@@ -126,6 +128,8 @@ export interface RecordTurnMessage {
     model: string;
     contextPct: number;
     cost: number | null;
+    /** First meaningful line of user prompt, for Conversation DNA. */
+    topicHint?: string;
 }
 
 /** Mark a conversation as finalized (user navigated away or tab closed) */
