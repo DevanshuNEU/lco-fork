@@ -9,6 +9,7 @@ import {
     type HandoffContext,
 } from '../../lib/handoff-summary';
 import type { ConversationRecord } from '../../lib/conversation-store';
+import { EMPTY_DNA } from '../../lib/conversation-store';
 import type { HealthScore } from '../../lib/health-score';
 
 function makeConversation(overrides: Partial<ConversationRecord> = {}): ConversationRecord {
@@ -25,6 +26,7 @@ function makeConversation(overrides: Partial<ConversationRecord> = {}): Conversa
         model: 'claude-sonnet-4-6',
         estimatedCost: 0.255,
         turns: [],
+        dna: { ...EMPTY_DNA },
         _v: 1,
         ...overrides,
     };

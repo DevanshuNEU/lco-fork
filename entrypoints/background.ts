@@ -236,7 +236,7 @@ export default defineBackground({
           contextPct: message.contextPct,
           cost: message.cost,
           completedAt: Date.now(),
-        })
+        }, message.topicHint)
           .then(() => {
             // Track the active conversation for this tab so tab-close can finalize it.
             if (tabId !== undefined) {
