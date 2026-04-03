@@ -10,7 +10,7 @@ import { createOverlay } from '../ui/overlay';
 import { showEnableBanner } from '../ui/enable-banner';
 import { ClaudeAdapter } from '../lib/adapters/claude';
 import { analyzeContext, shouldDismiss, signalKey, pickTopSignal } from '../lib/context-intelligence';
-import type { ConversationState, ContextSignal } from '../lib/context-intelligence';
+import type { ConversationState } from '../lib/context-intelligence';
 import { getContextWindowSize, calculateCost } from '../lib/pricing';
 import { extractConversationId } from '../lib/conversation-store';
 import type { ConversationRecord } from '../lib/conversation-store';
