@@ -2,7 +2,7 @@
 // Thin orchestrator: validates bridge messages, drives state transitions, renders overlay.
 // All logic lives in imported modules; this file only wires them together.
 
-import type { LcoBridgeMessage, StoreTokenBatchMessage, StoreMessageLimitMessage, StoreTokenBatchResponse, RecordTurnMessage, FinalizeConversationMessage } from '../lib/message-types';
+import type { LcoBridgeMessage, StoreTokenBatchMessage, StoreMessageLimitMessage, StoreTokenBatchResponse, RecordTurnMessage, FinalizeConversationMessage, SetActiveConvMessage } from '../lib/message-types';
 import { LCO_NAMESPACE } from '../lib/message-types';
 import { isValidBridgeSchema } from '../lib/bridge-validation';
 import { INITIAL_STATE, applyTokenBatch, applyStreamComplete, applyStorageResponse, applyHealthBroken, applyHealthRecovered, applyMessageLimit, applyRestoredConversation } from '../lib/overlay-state';
@@ -337,6 +337,13 @@ async function initializeMonitoring(): Promise<void> {
                 });
             }
             currentConversationId = newId;
+
+            // Notify background immediately so the side panel dashboard can
+            // refresh without waiting for the first RECORD_TURN of the new conversation.
+            browser.runtime.sendMessage({
+                type: 'SET_ACTIVE_CONV',
+                conversationId: newId ?? null,
+            } satisfies SetActiveConvMessage).catch(() => { /* non-critical */ });
 
             state = { ...INITIAL_STATE };
             convState = freshConvState();
