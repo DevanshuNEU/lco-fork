@@ -180,6 +180,33 @@ export const OVERLAY_CSS = `
   margin: 2px 0 3px;
 }
 
+/* ── Start fresh button ── */
+
+.lco-start-fresh {
+  display: block;
+  width: 100%;
+  margin: 5px 0 3px;
+  padding: 5px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--lco-accent);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.lco-start-fresh:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.lco-start-fresh:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 /* ── Progress bars ── */
 
 .lco-bar-row {

@@ -12,8 +12,9 @@ import { ClaudeAdapter } from '../lib/adapters/claude';
 import { analyzeContext, shouldDismiss, signalKey, pickTopSignal } from '../lib/context-intelligence';
 import type { ConversationState, ContextSignal } from '../lib/context-intelligence';
 import { getContextWindowSize, calculateCost } from '../lib/pricing';
-import { extractConversationId } from '../lib/conversation-store';
+import { extractConversationId, getConversation } from '../lib/conversation-store';
 import { computeHealthScore, computeGrowthRate } from '../lib/health-score';
+import { buildHandoffSummary } from '../lib/handoff-summary';
 
 export default defineContentScript({
     matches: ['https://claude.ai/*'],
@@ -196,6 +197,35 @@ async function initializeMonitoring(): Promise<void> {
     document.documentElement.appendChild(host);
     const shadow = host.attachShadow({ mode: 'closed' });
     overlay.mount(shadow);
+
+    // "Start fresh" flow: build handoff summary, copy to clipboard, navigate to new chat.
+    overlay.onStartFresh(async () => {
+        try {
+            // Fetch the current conversation record from storage (via background).
+            let summary = '';
+            if (currentConversationId && state.health) {
+                const conv = await browser.runtime.sendMessage({
+                    type: 'GET_CONVERSATION',
+                    conversationId: currentConversationId,
+                });
+                if (conv) {
+                    summary = buildHandoffSummary({ conversation: conv, health: state.health });
+                }
+            }
+
+            // Copy summary to clipboard so the user can paste it.
+            if (summary) {
+                await navigator.clipboard.writeText(summary).catch(() => {
+                    // Clipboard may fail without user gesture focus; non-critical.
+                });
+            }
+
+            // Navigate to new chat. claude.ai SPA responds to /new.
+            window.location.href = 'https://claude.ai/new';
+        } catch (err) {
+            console.error('[LCO-ERROR] Start fresh flow failed:', err);
+        }
+    });
 
     // Reset overlay, conversation state, and dismissed nudges on SPA navigation (Chrome 102+).
     // Also finalize the previous conversation and detect the new one.

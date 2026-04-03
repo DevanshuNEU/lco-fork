@@ -8,6 +8,7 @@ import type { BackgroundMessage, TabState, SessionCost } from '../lib/message-ty
 import { calculateCost } from '../lib/pricing';
 import {
     setStorage,
+    getConversation,
     recordTurn,
     finalizeConversation,
     computeDailySummary,
@@ -259,6 +260,17 @@ export default defineBackground({
           .catch((err) => {
             console.error('[LCO-ERROR] Failed to finalize conversation:', err);
             sendResponse({ ok: false });
+          });
+        return true;
+      }
+
+      // Fetch a conversation record for the "Start fresh" flow.
+      if (message.type === 'GET_CONVERSATION') {
+        getConversation(message.conversationId)
+          .then((conv) => sendResponse(conv))
+          .catch((err) => {
+            console.error('[LCO-ERROR] Failed to get conversation:', err);
+            sendResponse(null);
           });
         return true;
       }

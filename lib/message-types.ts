@@ -134,13 +134,20 @@ export interface FinalizeConversationMessage {
     conversationId: string;
 }
 
+/** Fetch a conversation record from chrome.storage.local */
+export interface GetConversationMessage {
+    type: 'GET_CONVERSATION';
+    conversationId: string;
+}
+
 /** Union of all valid messages the background script will handle */
 export type BackgroundMessage =
     | CountTokensMessage
     | StoreTokenBatchMessage
     | StoreMessageLimitMessage
     | RecordTurnMessage
-    | FinalizeConversationMessage;
+    | FinalizeConversationMessage
+    | GetConversationMessage;
 
 /** Response returned by the background after STORE_TOKEN_BATCH */
 export interface StoreTokenBatchResponse {
