@@ -1,0 +1,402 @@
+/* entrypoints/sidepanel/dashboard.css
+   Side panel dashboard styles. Uses CSS custom properties for theming.
+   Matches the overlay's warm orange accent and neutral palette. */
+
+/* ── Reset & Variables ──────────────────────────────────────────────────────── */
+
+:root {
+    --lco-bg: #ffffff;
+    --lco-bg-card: #f8f7f5;
+    --lco-bg-hover: #f0efed;
+    --lco-text: #1a1a1a;
+    --lco-text-secondary: #6b6b6b;
+    --lco-text-muted: #a0a0a0;
+    --lco-border: #e5e3df;
+    --lco-accent: #d4956a;
+    --lco-accent-light: rgba(212, 149, 106, 0.12);
+    --lco-health-green: #4caf50;
+    --lco-health-yellow: #f5a623;
+    --lco-health-red: #e53935;
+    --lco-context-fill: #d4956a;
+    --lco-context-track: #e5e3df;
+    --lco-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --lco-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --lco-radius: 8px;
+    --lco-radius-sm: 4px;
+    --lco-transition: 200ms ease;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --lco-bg: #1a1a1a;
+        --lco-bg-card: #242424;
+        --lco-bg-hover: #2e2e2e;
+        --lco-text: #e8e6e3;
+        --lco-text-secondary: #a0a0a0;
+        --lco-text-muted: #6b6b6b;
+        --lco-border: #333333;
+        --lco-accent: #d4956a;
+        --lco-accent-light: rgba(212, 149, 106, 0.15);
+        --lco-context-track: #333333;
+    }
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--lco-font);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--lco-text);
+    background: var(--lco-bg);
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Dashboard container ────────────────────────────────────────────────────── */
+
+.lco-dash {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 16px 12px;
+}
+
+.lco-dash-loading {
+    text-align: center;
+    color: var(--lco-text-muted);
+    padding: 40px 0;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────────── */
+
+.lco-dash-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 4px 16px;
+    border-bottom: 1px solid var(--lco-border);
+    margin-bottom: 12px;
+}
+
+.lco-dash-logo {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--lco-radius);
+    border: 2px dashed var(--lco-border);
+    flex-shrink: 0;
+}
+
+.lco-dash-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--lco-text);
+}
+
+.lco-dash-subtitle {
+    font-size: 11px;
+    color: var(--lco-text-muted);
+    letter-spacing: 0.02em;
+}
+
+/* ── Collapsible sections ───────────────────────────────────────────────────── */
+
+.lco-dash-section {
+    margin-bottom: 8px;
+}
+
+.lco-dash-section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 4px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: var(--lco-font);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--lco-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-radius: var(--lco-radius-sm);
+    transition: background var(--lco-transition);
+}
+
+.lco-dash-section-header:hover {
+    background: var(--lco-bg-hover);
+}
+
+.lco-dash-arrow {
+    font-size: 8px;
+    color: var(--lco-text-muted);
+    transition: transform var(--lco-transition);
+    display: inline-block;
+}
+
+.lco-dash-arrow--open {
+    transform: rotate(90deg);
+}
+
+.lco-dash-section-title {
+    flex: 1;
+    text-align: left;
+}
+
+.lco-dash-section-body {
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 250ms ease, opacity 200ms ease;
+}
+
+.lco-dash-section-body--open {
+    max-height: 600px;
+    opacity: 1;
+}
+
+.lco-dash-section-inner {
+    padding: 4px 0 8px;
+}
+
+/* ── Today card ─────────────────────────────────────────────────────────────── */
+
+.lco-dash-today {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.lco-dash-today--empty {
+    opacity: 0.5;
+}
+
+.lco-dash-metric {
+    background: var(--lco-bg-card);
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius);
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.lco-dash-metric-value {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: var(--lco-font-mono);
+    letter-spacing: -0.02em;
+    color: var(--lco-text);
+}
+
+.lco-dash-metric-label {
+    font-size: 11px;
+    color: var(--lco-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ── Active conversation ────────────────────────────────────────────────────── */
+
+.lco-dash-active {
+    background: var(--lco-bg-card);
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius);
+    padding: 12px;
+    transition: opacity 150ms ease;
+}
+
+.lco-dash-active--empty {
+    border-style: dashed;
+}
+
+.lco-dash-active--hidden {
+    opacity: 0;
+}
+
+.lco-dash-active--visible {
+    opacity: 1;
+}
+
+.lco-dash-placeholder {
+    color: var(--lco-text-muted);
+    text-align: center;
+    padding: 8px 0;
+    font-size: 12px;
+}
+
+.lco-dash-active-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.lco-dash-health-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.lco-dash-health-dot--healthy { background: var(--lco-health-green); }
+.lco-dash-health-dot--degrading { background: var(--lco-health-yellow); }
+.lco-dash-health-dot--critical { background: var(--lco-health-red); }
+
+.lco-dash-health-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--lco-text-secondary);
+}
+
+.lco-dash-active-subject {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--lco-text);
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.lco-dash-context-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.lco-dash-context-bar {
+    flex: 1;
+    height: 6px;
+    background: var(--lco-context-track);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.lco-dash-context-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 300ms ease;
+}
+
+.lco-dash-context-fill--healthy { background: var(--lco-health-green); }
+.lco-dash-context-fill--degrading { background: var(--lco-health-yellow); }
+.lco-dash-context-fill--critical { background: var(--lco-health-red); }
+
+.lco-dash-context-label {
+    font-size: 11px;
+    color: var(--lco-text-muted);
+    white-space: nowrap;
+    font-family: var(--lco-font-mono);
+}
+
+.lco-dash-active-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--lco-text-secondary);
+}
+
+/* ── Conversation list ──────────────────────────────────────────────────────── */
+
+.lco-dash-convlist {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lco-dash-convlist--empty {
+    padding: 12px 0;
+}
+
+.lco-dash-conv-item {
+    padding: 10px;
+    border-radius: var(--lco-radius);
+    border: 1px solid var(--lco-border);
+    background: var(--lco-bg-card);
+    transition: background var(--lco-transition);
+    animation: lco-dash-slide-in 200ms ease both;
+}
+
+.lco-dash-conv-item:hover {
+    background: var(--lco-bg-hover);
+}
+
+.lco-dash-conv-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.lco-dash-conv-subject {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--lco-text);
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lco-dash-conv-time {
+    font-size: 11px;
+    color: var(--lco-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.lco-dash-conv-bottom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--lco-text-secondary);
+}
+
+.lco-dash-conv-model {
+    background: var(--lco-accent-light);
+    color: var(--lco-accent);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    font-size: 10px;
+}
+
+.lco-dash-conv-turns,
+.lco-dash-conv-cost {
+    font-family: var(--lco-font-mono);
+    font-size: 11px;
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+
+@keyframes lco-dash-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lco-dash-section-body {
+        transition: none;
+    }
+    .lco-dash-active {
+        transition: none;
+    }
+    .lco-dash-conv-item {
+        animation: none;
+    }
+    .lco-dash-context-fill {
+        transition: none;
+    }
+}

@@ -42,6 +42,12 @@ async function initTokenizer(): Promise<Tiktoken> {
 // time the worker handles the first message.
 _initPromise = initTokenizer();
 
+// Side Panel: clicking the extension toolbar icon opens the side panel.
+// Guard: WXT's prepare step evaluates this file in Node.js where chrome.sidePanel is undefined.
+if (typeof chrome !== 'undefined' && chrome.sidePanel) {
+    chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+}
+
 // Storage Helpers
 
 /** Build the per-tab storage key for token state */

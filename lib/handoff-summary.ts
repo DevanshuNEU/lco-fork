@@ -8,6 +8,7 @@
 
 import type { ConversationRecord, ConversationDNA } from './conversation-store';
 import type { HealthScore } from './health-score';
+import { formatTokens, formatModel } from './format';
 
 export interface HandoffContext {
     conversation: ConversationRecord;
@@ -94,21 +95,4 @@ function deduplicateHints(hints: string[]): string[] {
     return result;
 }
 
-/** Format token count for human readability. */
-function formatTokens(n: number): string {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-    return String(n);
-}
-
-/** Format model name for human readability. */
-function formatModel(model: string): string {
-    const match = model.match(/claude-(\w+)-(\d+)-(\d+)/i);
-    if (match) {
-        const name = match[1].charAt(0).toUpperCase() + match[1].slice(1);
-        return `${name} ${match[2]}.${match[3]}`;
-    }
-    return model;
-}
-
-export { formatTokens, formatModel, deduplicateHints };
+export { deduplicateHints };

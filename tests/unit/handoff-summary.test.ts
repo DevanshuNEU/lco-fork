@@ -4,10 +4,9 @@
 import { describe, it, expect } from 'vitest';
 import {
     buildHandoffSummary,
-    formatTokens,
-    formatModel,
     type HandoffContext,
 } from '../../lib/handoff-summary';
+import { formatTokens, formatModel } from '../../lib/format';
 import type { ConversationRecord } from '../../lib/conversation-store';
 import { EMPTY_DNA } from '../../lib/conversation-store';
 import type { HealthScore } from '../../lib/health-score';
