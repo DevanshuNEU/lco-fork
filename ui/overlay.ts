@@ -11,9 +11,10 @@ import type { ContextSignal } from '../lib/context-intelligence';
 export interface OverlayHandle {
     mount(shadow: ShadowRoot): void;
     render(state: OverlayState): void;
-    // signal: the highest-severity active signal. onDismiss: called when user clicks X.
     showNudge(signal: ContextSignal, onDismiss: () => void): void;
     hideNudge(): void;
+    /** Register the callback for the "Start fresh" button. Called once at setup. */
+    onStartFresh(callback: () => void): void;
 }
 
 function fmt(n: number): string {
@@ -37,6 +38,8 @@ export function createOverlay(): OverlayHandle {
     let elContextFill: HTMLElement | null = null;
     let elContextLabel: HTMLElement | null = null;
     let elCoaching: HTMLElement | null = null;
+    let elStartFresh: HTMLButtonElement | null = null;
+    let startFreshCallback: (() => void) | null = null;
     let elLimitRow: HTMLElement | null = null;
     let elLimitFill: HTMLElement | null = null;
     let elLimitLabel: HTMLElement | null = null;
@@ -136,6 +139,17 @@ export function createOverlay(): OverlayHandle {
         coaching.style.display = 'none';
         elCoaching = coaching;
         body.appendChild(coaching);
+
+        // "Start fresh" button (visible when Degrading or Critical)
+        const freshBtn = document.createElement('button');
+        freshBtn.className = 'lco-start-fresh';
+        freshBtn.textContent = 'Start fresh';
+        freshBtn.style.display = 'none';
+        freshBtn.addEventListener('click', () => {
+            if (startFreshCallback) startFreshCallback();
+        });
+        elStartFresh = freshBtn;
+        body.appendChild(freshBtn);
 
         // Message limit bar
         const limitRow = document.createElement('div');
@@ -267,6 +281,12 @@ export function createOverlay(): OverlayHandle {
             }
         }
 
+        // "Start fresh" button: visible when Degrading or Critical.
+        if (elStartFresh) {
+            const showFresh = state.health !== null && state.health.level !== 'healthy';
+            elStartFresh.style.display = showFresh ? '' : 'none';
+        }
+
         if (elLimitRow && elLimitFill && elLimitLabel) {
             const visible = state.messageLimitUtilization !== null;
             elLimitRow.style.display = visible ? '' : 'none';
@@ -338,5 +358,9 @@ export function createOverlay(): OverlayHandle {
         }, 200);
     }
 
-    return { mount, render, showNudge, hideNudge };
+    function onStartFresh(callback: () => void): void {
+        startFreshCallback = callback;
+    }
+
+    return { mount, render, showNudge, hideNudge, onStartFresh };
 }
