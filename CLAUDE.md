@@ -52,6 +52,8 @@ Each concern gets its own layer. When adding a feature, ask: "Which layer does t
 - **Orchestrator** (content script): Wires agents together, tracks per-conversation state, drives the rendering layer.
 - **Rendering layer** (ui/): DOM creation, styling, animations. No business logic. Receives pre-computed state from the orchestrator.
 
+The Message bridge and Orchestrator are co-located in `entrypoints/claude-ai.content.ts` but have separate responsibilities. The bridge section (postMessage listener, 5-layer validation, forwarding to background) must stay a thin relay with no business logic. The orchestrator section (agent calls, state tracking, rendering) is where agents are wired together. When adding code, know which section you are in.
+
 ## Key Technical Decisions
 
 - **Vanilla DOM overlay, not React.** WXT silently strips React from content scripts at document_start. Vanilla DOM eliminates the bundling issue and is faster for a small widget.

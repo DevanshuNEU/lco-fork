@@ -119,17 +119,19 @@ describe('analyzePrompt: model_suggestion', () => {
 
     it('has type model_suggestion, severity info, dismissible true', () => {
         const signals = analyzePrompt(shortNoCode, 'claude-opus-4-6', 0);
-        const s = signals.find(x => x.type === 'model_suggestion')!;
-        expect(s.type).toBe('model_suggestion');
-        expect(s.severity).toBe('info');
-        expect(s.dismissible).toBe(true);
+        const s = signals.find(x => x.type === 'model_suggestion');
+        expect(s).toBeDefined();
+        expect(s!.type).toBe('model_suggestion');
+        expect(s!.severity).toBe('info');
+        expect(s!.dismissible).toBe(true);
     });
 
     it('message mentions Haiku and cost savings', () => {
         const signals = analyzePrompt(shortNoCode, 'claude-opus-4-6', 0);
-        const s = signals.find(x => x.type === 'model_suggestion')!;
-        expect(s.message).toContain('Haiku');
-        expect(s.message).toContain('cost');
+        const s = signals.find(x => x.type === 'model_suggestion');
+        expect(s).toBeDefined();
+        expect(s!.message).toContain('Haiku');
+        expect(s!.message).toContain('cost');
     });
 });
 
@@ -169,27 +171,30 @@ describe('analyzePrompt: large_paste', () => {
     it('has type large_paste, severity info, dismissible true', () => {
         const chars: PromptCharacteristics = { promptLength: 500, hasCodeBlock: true, isShortFollowUp: false };
         const signals = analyzePrompt(chars, 'claude-sonnet-4-6', 0);
-        const s = signals.find(x => x.type === 'large_paste')!;
-        expect(s.type).toBe('large_paste');
-        expect(s.severity).toBe('info');
-        expect(s.dismissible).toBe(true);
+        const s = signals.find(x => x.type === 'large_paste');
+        expect(s).toBeDefined();
+        expect(s!.type).toBe('large_paste');
+        expect(s!.severity).toBe('info');
+        expect(s!.dismissible).toBe(true);
     });
 
     it('message includes approximate token count', () => {
         const chars: PromptCharacteristics = { promptLength: 800, hasCodeBlock: true, isShortFollowUp: false };
         const signals = analyzePrompt(chars, 'claude-sonnet-4-6', 0);
-        const s = signals.find(x => x.type === 'large_paste')!;
+        const s = signals.find(x => x.type === 'large_paste');
+        expect(s).toBeDefined();
         // 800 / 4 = 200 tokens
-        expect(s.message).toContain('200');
-        expect(s.message).toContain('tokens');
+        expect(s!.message).toContain('200');
+        expect(s!.message).toContain('tokens');
     });
 
     it('rounds token estimate correctly', () => {
         // 501 chars -> Math.round(501 / 4) = 125
         const chars: PromptCharacteristics = { promptLength: 501, hasCodeBlock: true, isShortFollowUp: false };
         const signals = analyzePrompt(chars, 'claude-sonnet-4-6', 0);
-        const s = signals.find(x => x.type === 'large_paste')!;
-        expect(s.message).toContain('125');
+        const s = signals.find(x => x.type === 'large_paste');
+        expect(s).toBeDefined();
+        expect(s!.message).toContain('125');
     });
 });
 
@@ -225,16 +230,18 @@ describe('analyzePrompt: follow_up_chain', () => {
 
     it('has type follow_up_chain, severity info, dismissible true', () => {
         const signals = analyzePrompt(noCode, 'claude-sonnet-4-6', 3);
-        const s = signals.find(x => x.type === 'follow_up_chain')!;
-        expect(s.type).toBe('follow_up_chain');
-        expect(s.severity).toBe('info');
-        expect(s.dismissible).toBe(true);
+        const s = signals.find(x => x.type === 'follow_up_chain');
+        expect(s).toBeDefined();
+        expect(s!.type).toBe('follow_up_chain');
+        expect(s!.severity).toBe('info');
+        expect(s!.dismissible).toBe(true);
     });
 
     it('message includes the count of follow-ups', () => {
         const signals = analyzePrompt(noCode, 'claude-sonnet-4-6', 5);
-        const s = signals.find(x => x.type === 'follow_up_chain')!;
-        expect(s.message).toContain('5');
+        const s = signals.find(x => x.type === 'follow_up_chain');
+        expect(s).toBeDefined();
+        expect(s!.message).toContain('5');
     });
 });
 
