@@ -69,7 +69,7 @@ export function createOverlay(): OverlayHandle {
 
         const title = document.createElement('span');
         title.className = 'lco-title';
-        title.textContent = 'LCO';
+        title.textContent = 'SAAR';
 
         const costMini = document.createElement('span');
         costMini.className = 'lco-cost-mini';
@@ -224,7 +224,7 @@ export function createOverlay(): OverlayHandle {
         let collapsed = false;
         header.addEventListener('click', () => {
             collapsed = !collapsed;
-            body.style.display = collapsed ? 'none' : '';
+            body.classList.toggle('lco-body--collapsed', collapsed);
             costMini.style.display = collapsed ? '' : 'none';
             widget.classList.toggle('lco-collapsed', collapsed);
         });
