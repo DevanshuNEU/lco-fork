@@ -102,6 +102,15 @@ async function initializeMonitoring(): Promise<void> {
     // This gives the overlay correct context % and turn count immediately
     // on page load, instead of showing 0% until the user sends a message.
     if (currentConversationId) {
+        // Tell background which conversation is active so the side panel
+        // dashboard can display it immediately. Without this, SET_ACTIVE_CONV
+        // only fires on SPA navigation, leaving the dashboard empty after
+        // extension reload or fresh page load.
+        browser.runtime.sendMessage({
+            type: 'SET_ACTIVE_CONV',
+            conversationId: currentConversationId,
+        } satisfies SetActiveConvMessage).catch(() => { /* non-critical */ });
+
         const record = await fetchStoredRecord(currentConversationId);
         if (record) {
             cumulativeInput = record.totalInputTokens;
