@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
     getDailySummary,
+    computeDailySummary,
     getConversation,
     listConversations,
     todayDateString,
@@ -38,7 +39,10 @@ export function useDashboardData(): DashboardData {
 
     const loadToday = useCallback(async () => {
         try {
-            const summary = await getDailySummary(todayDateString());
+            const date = todayDateString();
+            // Try the cached summary first; compute on demand if the 30-min alarm
+            // has not fired yet today (avoids the "all zeros" cold-start bug).
+            const summary = await getDailySummary(date) ?? await computeDailySummary(date);
             setToday(summary);
         } catch {
             // First use of the day: no summary yet.
