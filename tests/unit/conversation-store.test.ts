@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
     extractConversationId,
+    extractOrganizationId,
     todayDateString,
     isoWeekId,
     setStorage,
@@ -476,5 +477,192 @@ describe('edge cases', () => {
         const record = await recordTurn(TEST_ORG, CONV_ID, makeTurn());
         expect(record.turnCount).toBe(2);
         // finalized stays true from before; the new turn just appends
+    });
+});
+
+// ── extractOrganizationId ────────────────────────────────────────────────────
+
+describe('extractOrganizationId', () => {
+    it('extracts org UUID from a completion API URL', () => {
+        const url = 'https://claude.ai/api/organizations/a1b2c3d4-e5f6-7890-abcd-ef1234567890/chat_conversations/conv-456/completion';
+        expect(extractOrganizationId(url)).toBe('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+    });
+
+    it('lowercases the org UUID', () => {
+        const url = 'https://claude.ai/api/organizations/AABB1122-CCDD-3344-EEFF-556677889900/chat_conversations/conv/completion';
+        expect(extractOrganizationId(url)).toBe('aabb1122-ccdd-3344-eeff-556677889900');
+    });
+
+    it('extracts from URLs with query strings', () => {
+        const url = 'https://claude.ai/api/organizations/aabb0042-ccdd-eeff/chat_conversations/c/completion?encoding=sse';
+        expect(extractOrganizationId(url)).toBe('aabb0042-ccdd-eeff');
+    });
+
+    it('returns null for a page URL without organizations path', () => {
+        expect(extractOrganizationId('https://claude.ai/chat/abc-123')).toBeNull();
+    });
+
+    it('returns null for an empty string', () => {
+        expect(extractOrganizationId('')).toBeNull();
+    });
+
+    it('returns null for a URL with no match', () => {
+        expect(extractOrganizationId('https://example.com/api/users/123')).toBeNull();
+    });
+});
+
+// ── Account isolation ────────────────────────────────────────────────────────
+
+describe('account isolation', () => {
+    const ORG_A = 'org-alice-aaa';
+    const ORG_B = 'org-bob-bbb';
+    const CONV_ID = 'shared-conv-id';
+
+    it('same conversation ID under two accounts produces separate records', async () => {
+        await recordTurn(ORG_A, CONV_ID, makeTurn({ inputTokens: 100 }));
+        await recordTurn(ORG_B, CONV_ID, makeTurn({ inputTokens: 999 }));
+
+        const a = await getConversation(ORG_A, CONV_ID);
+        const b = await getConversation(ORG_B, CONV_ID);
+        expect(a!.totalInputTokens).toBe(100);
+        expect(b!.totalInputTokens).toBe(999);
+    });
+
+    it('listConversations returns only the queried account data', async () => {
+        await recordTurn(ORG_A, 'conv-1', makeTurn());
+        await recordTurn(ORG_A, 'conv-2', makeTurn());
+        await recordTurn(ORG_B, 'conv-3', makeTurn());
+
+        const listA = await listConversations(ORG_A, 10);
+        const listB = await listConversations(ORG_B, 10);
+        expect(listA).toHaveLength(2);
+        expect(listB).toHaveLength(1);
+        expect(listA.map(c => c.id)).toContain('conv-1');
+        expect(listA.map(c => c.id)).toContain('conv-2');
+        expect(listB[0].id).toBe('conv-3');
+    });
+
+    it('daily summaries are isolated per account', async () => {
+        const ts = new Date('2026-04-05T12:00:00').getTime();
+        await recordTurn(ORG_A, 'conv-a', makeTurn({ inputTokens: 500, completedAt: ts }));
+        await recordTurn(ORG_B, 'conv-b', makeTurn({ inputTokens: 2000, completedAt: ts }));
+
+        const summaryA = await computeDailySummary(ORG_A, '2026-04-05');
+        const summaryB = await computeDailySummary(ORG_B, '2026-04-05');
+
+        expect(summaryA.totalInputTokens).toBe(500);
+        expect(summaryB.totalInputTokens).toBe(2000);
+        expect(summaryA.conversationCount).toBe(1);
+        expect(summaryB.conversationCount).toBe(1);
+    });
+
+    it('pruneConversations only deletes from the target account', async () => {
+        const old = Date.now() - 100 * 86400000;
+        await recordTurn(ORG_A, 'old-a', makeTurn({ completedAt: old }));
+        await recordTurn(ORG_B, 'old-b', makeTurn({ completedAt: old }));
+
+        const cutoff = Date.now() - 90 * 86400000;
+        await pruneConversations(ORG_A, cutoff);
+
+        expect(await getConversation(ORG_A, 'old-a')).toBeNull();
+        expect(await getConversation(ORG_B, 'old-b')).not.toBeNull();
+    });
+
+    it('finalizeConversation only affects the target account', async () => {
+        await recordTurn(ORG_A, CONV_ID, makeTurn());
+        await recordTurn(ORG_B, CONV_ID, makeTurn());
+
+        await finalizeConversation(ORG_A, CONV_ID);
+
+        const a = await getConversation(ORG_A, CONV_ID);
+        const b = await getConversation(ORG_B, CONV_ID);
+        expect(a!.finalized).toBe(true);
+        expect(b!.finalized).toBe(false);
+    });
+});
+
+// ── Legacy data migration ────────────────────────────────────────────────────
+
+describe('legacy data migration', () => {
+    it('reads from old global key when scoped key does not exist', async () => {
+        // Simulate pre-migration data: old key format conv:{convId}
+        const legacyRecord: ConversationRecord = {
+            id: 'legacy-conv',
+            startedAt: 1000,
+            lastActiveAt: 2000,
+            finalized: false,
+            turnCount: 3,
+            totalInputTokens: 500,
+            totalOutputTokens: 100,
+            peakContextPct: 10,
+            lastContextPct: 10,
+            model: 'claude-sonnet-4-6',
+            estimatedCost: 0.003,
+            turns: [],
+            dna: { subject: 'old topic', lastContext: 'old topic', hints: ['old topic'] },
+            _v: 1,
+        };
+        mockStore._raw['conv:legacy-conv'] = legacyRecord;
+
+        const result = await getConversation(TEST_ORG, 'legacy-conv');
+        expect(result).not.toBeNull();
+        expect(result!.totalInputTokens).toBe(500);
+    });
+
+    it('copies legacy data to the new scoped key on first read', async () => {
+        const legacyRecord: ConversationRecord = {
+            id: 'migrate-me',
+            startedAt: 1000,
+            lastActiveAt: 2000,
+            finalized: false,
+            turnCount: 1,
+            totalInputTokens: 100,
+            totalOutputTokens: 20,
+            peakContextPct: 5,
+            lastContextPct: 5,
+            model: 'claude-sonnet-4-6',
+            estimatedCost: 0.001,
+            turns: [],
+            dna: { subject: '', lastContext: '', hints: [] },
+            _v: 1,
+        };
+        mockStore._raw['conv:migrate-me'] = legacyRecord;
+
+        // First read triggers migration.
+        await getConversation(TEST_ORG, 'migrate-me');
+
+        // New scoped key should now exist.
+        const scopedKey = `conv:${TEST_ORG}:migrate-me`;
+        expect(mockStore._raw[scopedKey]).toBeDefined();
+        expect((mockStore._raw[scopedKey] as ConversationRecord).totalInputTokens).toBe(100);
+    });
+
+    it('new scoped key takes precedence over old global key', async () => {
+        // Both old and new keys exist with different data.
+        const oldRecord: ConversationRecord = {
+            id: 'dual-conv',
+            startedAt: 1000,
+            lastActiveAt: 2000,
+            finalized: false,
+            turnCount: 1,
+            totalInputTokens: 100,
+            totalOutputTokens: 20,
+            peakContextPct: 5,
+            lastContextPct: 5,
+            model: 'claude-sonnet-4-6',
+            estimatedCost: 0.001,
+            turns: [],
+            dna: { subject: '', lastContext: '', hints: [] },
+            _v: 1,
+        };
+        const newRecord: ConversationRecord = {
+            ...oldRecord,
+            totalInputTokens: 999,
+        };
+        mockStore._raw['conv:dual-conv'] = oldRecord;
+        mockStore._raw[`conv:${TEST_ORG}:dual-conv`] = newRecord;
+
+        const result = await getConversation(TEST_ORG, 'dual-conv');
+        expect(result!.totalInputTokens).toBe(999); // new key wins
     });
 });
