@@ -1,43 +1,53 @@
 // ui/overlay-styles.ts
 // CSS injected as a string into the closed Shadow DOM.
 // Exported as a TypeScript constant to bypass WXT's CSS import interception.
+//
+// Design language: Claude-aligned. Frosted glass, warm terra cotta accent,
+// minimal typography, physics-inspired easing. The widget should feel like
+// a native part of claude.ai, not a bolted-on extension.
 
 export const OVERLAY_CSS = `
 :host {
-  /* Matches claude.ai dark panel color (~#252527). Solid, no frosted glass. */
-  --lco-bg:           #252528;
-  --lco-bg-hover:     #2c2c30;
-  --lco-text:         #d4d4d8;
-  --lco-muted:        #71717a;
-  /* Warm orange — echoes Claude's own coral brand color, not purple. */
-  --lco-accent:       #d4956a;
-  --lco-bar-fill:     #c17a4e;
-  --lco-bar-glow:     rgba(193, 122, 78, 0.28);
-  --lco-bar-bg:       rgba(193, 122, 78, 0.12);
+  /* Claude terra cotta palette */
+  --lco-accent:       #c15f3c;
+  --lco-bar-fill:     #c15f3c;
+  --lco-bar-glow:     rgba(193, 95, 60, 0.28);
+  --lco-bar-bg:       rgba(193, 95, 60, 0.10);
   --lco-warn-fill:    #f59e0b;
   --lco-warn-glow:    rgba(245, 158, 11, 0.22);
   --lco-warn-bg:      rgba(245, 158, 11, 0.09);
+
+  /* Dark mode (default on claude.ai) */
+  --lco-bg:           rgba(30, 30, 32, 0.82);
+  --lco-bg-hover:     rgba(38, 38, 42, 0.88);
+  --lco-text:         #d4d4d8;
+  --lco-muted:        #71717a;
   --lco-border:       rgba(255, 255, 255, 0.06);
   --lco-border-hover: rgba(255, 255, 255, 0.12);
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 @media (prefers-color-scheme: light) {
   :host {
-    --lco-bg:           #ffffff;
-    --lco-bg-hover:     #f4f4f5;
+    --lco-bg:           rgba(244, 243, 238, 0.85);
+    --lco-bg-hover:     rgba(238, 236, 230, 0.90);
     --lco-text:         #27272a;
     --lco-muted:        #a1a1aa;
-    --lco-accent:       #b36a3a;
-    --lco-bar-fill:     #b36a3a;
-    --lco-bar-glow:     rgba(179, 106, 58, 0.20);
-    --lco-bar-bg:       rgba(179, 106, 58, 0.10);
+    --lco-accent:       #b35a34;
+    --lco-bar-fill:     #b35a34;
+    --lco-bar-glow:     rgba(179, 90, 52, 0.20);
+    --lco-bar-bg:       rgba(179, 90, 52, 0.10);
     --lco-warn-fill:    #d97706;
     --lco-warn-glow:    rgba(217, 119, 6, 0.20);
     --lco-warn-bg:      rgba(217, 119, 6, 0.08);
-    --lco-border:       rgba(0, 0, 0, 0.07);
-    --lco-border-hover: rgba(0, 0, 0, 0.14);
+    --lco-border:       rgba(0, 0, 0, 0.06);
+    --lco-border-hover: rgba(0, 0, 0, 0.12);
   }
 }
+
+/* ── Animations ── */
 
 @keyframes lco-enter {
   from { opacity: 0; transform: translateY(10px) scale(0.96); }
@@ -49,6 +59,23 @@ export const OVERLAY_CSS = `
   50%       { opacity: 0.5; }
 }
 
+@keyframes lco-dot-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(248, 113, 113, 0.4); }
+  50%      { box-shadow: 0 0 10px rgba(248, 113, 113, 0.7); }
+}
+
+@keyframes lco-nudge-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes lco-nudge-out {
+  from { opacity: 1; transform: translateY(0);    }
+  to   { opacity: 0; transform: translateY(-4px); }
+}
+
+/* ── Widget container ── */
+
 .lco-widget {
   position: fixed;
   bottom: 88px;
@@ -58,16 +85,19 @@ export const OVERLAY_CSS = `
   max-width: 300px;
   padding: 8px 12px;
   background: var(--lco-bg);
+  backdrop-filter: blur(16px) saturate(1.4);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
   color: var(--lco-text);
   border-radius: 12px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   font-size: 11px;
-  line-height: 1.65;
+  line-height: 1.5;
   box-shadow:
     0 0 0 1px var(--lco-border),
-    0 8px 24px rgba(0, 0, 0, 0.35);
-  animation: lco-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transition: box-shadow 0.18s ease, background 0.18s ease;
+    0 4px 12px rgba(0, 0, 0, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.18);
+  animation: lco-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: box-shadow 0.2s ease, background 0.2s ease;
   cursor: default;
   user-select: none;
 }
@@ -76,7 +106,8 @@ export const OVERLAY_CSS = `
   background: var(--lco-bg-hover);
   box-shadow:
     0 0 0 1px var(--lco-border-hover),
-    0 12px 32px rgba(0, 0, 0, 0.45);
+    0 8px 20px rgba(0, 0, 0, 0.12),
+    0 24px 64px rgba(0, 0, 0, 0.22);
 }
 
 .lco-widget.lco-collapsed {
@@ -109,11 +140,24 @@ export const OVERLAY_CSS = `
   color: var(--lco-accent);
 }
 
-/* ── Body ── */
+/* ── Body (collapsible) ── */
 
 .lco-body {
   margin-top: 5px;
+  overflow: hidden;
+  max-height: 600px;
+  opacity: 1;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
 }
+
+.lco-body--collapsed {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  pointer-events: none;
+}
+
+/* ── Data rows ── */
 
 .lco-row {
   display: flex;
@@ -125,6 +169,7 @@ export const OVERLAY_CSS = `
 
 .lco-label {
   font-size: 10px;
+  line-height: 1.4;
   color: var(--lco-muted);
   flex-shrink: 0;
 }
@@ -158,15 +203,19 @@ export const OVERLAY_CSS = `
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+  /* No transition: health state changes are rare (once per conversation).
+     Instant swap avoids a paint-layer transition on the main thread. */
 }
 
 .lco-health-dot--healthy   { background: #4ade80; box-shadow: 0 0 4px rgba(74, 222, 128, 0.4); }
 .lco-health-dot--degrading { background: #fbbf24; box-shadow: 0 0 4px rgba(251, 191, 36, 0.4); }
-.lco-health-dot--critical  { background: #f87171; box-shadow: 0 0 4px rgba(248, 113, 113, 0.4); }
+.lco-health-dot--critical  { background: #f87171; animation: lco-dot-pulse 2s ease-in-out infinite; }
 
 .lco-health-label {
   font-size: 10px;
   font-weight: 600;
+  line-height: 1.4;
+  /* No transition: color is a paint property; health state changes snap instantly. */
 }
 
 .lco-health-label--healthy   { color: #4ade80; }
@@ -195,7 +244,7 @@ export const OVERLAY_CSS = `
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
 }
 
 .lco-start-fresh:hover {
@@ -205,6 +254,12 @@ export const OVERLAY_CSS = `
 
 .lco-start-fresh:active {
   background: rgba(255, 255, 255, 0.12);
+  transform: scale(0.97);
+}
+
+.lco-start-fresh:focus-visible {
+  outline: 2px solid var(--lco-accent);
+  outline-offset: 2px;
 }
 
 /* ── Progress bars ── */
@@ -229,11 +284,16 @@ export const OVERLAY_CSS = `
 }
 
 .lco-bar-fill {
+  width: 100%;
   height: 100%;
   background: var(--lco-bar-fill);
   border-radius: 99px;
   box-shadow: 0 0 6px var(--lco-bar-glow);
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+  /* scaleX is compositor-only: no layout, no paint, native 120fps. */
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .lco-bar-fill--warn {
@@ -251,6 +311,7 @@ export const OVERLAY_CSS = `
 
 .lco-bar-label {
   font-size: 9px;
+  line-height: 1.4;
   color: var(--lco-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -260,16 +321,6 @@ export const OVERLAY_CSS = `
 }
 
 /* ── Nudge ── */
-
-@keyframes lco-nudge-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: translateY(0);    }
-}
-
-@keyframes lco-nudge-out {
-  from { opacity: 1; transform: translateY(0);    }
-  to   { opacity: 0; transform: translateY(-4px); }
-}
 
 .lco-nudge {
   display: flex;
@@ -305,9 +356,15 @@ export const OVERLAY_CSS = `
   font-size: 11px;
   padding: 0 2px;
   line-height: 1;
+  transition: color 0.15s ease;
 }
 
 .lco-nudge-dismiss:hover { color: var(--lco-text); }
+
+.lco-nudge-dismiss:focus-visible {
+  outline: 2px solid var(--lco-accent);
+  outline-offset: 2px;
+}
 
 /* ── Health warning ── */
 
@@ -322,11 +379,15 @@ export const OVERLAY_CSS = `
 /* ── Motion-safe fallbacks ── */
 
 @media (prefers-reduced-motion: reduce) {
-  .lco-widget               { animation: none; transition: none; }
-  .lco-widget:hover         { transform: none; }
-  .lco-bar-fill             { transition: none; }
+  .lco-widget                 { animation: none; transition: none; }
+  .lco-widget:hover           { transform: none; }
+  .lco-body                   { transition: none; }
+  .lco-bar-fill               { transition: none; }
   .lco-bar-fill.lco-streaming { animation: none; }
+  .lco-health-dot--critical   { animation: none; }
+  .lco-start-fresh            { transition: none; }
   .lco-nudge,
-  .lco-nudge--exiting       { animation: none; }
+  .lco-nudge--exiting         { animation: none; }
+  .lco-nudge-dismiss          { transition: none; }
 }
 `;

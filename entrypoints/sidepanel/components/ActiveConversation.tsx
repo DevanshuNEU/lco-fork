@@ -16,14 +16,24 @@ export default function ActiveConversation({ conv, health }: Props) {
     const [visible, setVisible] = useState(false);
     const prevConvId = useRef<string | null>(null);
 
-    // Fade transition when conversation changes.
+    // Graceful swap: fade + scale out the old card, then pop in the new one.
+    // The 250ms delay matches the CSS opacity exit duration so the new content
+    // only appears after the old card has fully disappeared. transform + opacity
+    // are GPU-composited; no layout or paint for silky 60/120fps.
+    // When reduced motion is preferred, skip the delay entirely.
     useEffect(() => {
         if (conv?.id !== prevConvId.current) {
+            const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reducedMotion) {
+                prevConvId.current = conv?.id ?? null;
+                setVisible(true);
+                return;
+            }
             setVisible(false);
             const timer = setTimeout(() => {
                 prevConvId.current = conv?.id ?? null;
                 setVisible(true);
-            }, 150);
+            }, 250);
             return () => clearTimeout(timer);
         }
         setVisible(true);
@@ -38,7 +48,8 @@ export default function ActiveConversation({ conv, health }: Props) {
     }
 
     const subject = conv.dna?.subject || 'New conversation';
-    const contextPct = conv.lastContextPct;
+    const rawPct = conv.lastContextPct;
+    const safePct = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
     const healthLevel = health?.level ?? 'healthy';
     const healthLabel = health?.label ?? 'Healthy';
 
@@ -55,10 +66,10 @@ export default function ActiveConversation({ conv, health }: Props) {
                 <div className="lco-dash-context-bar">
                     <div
                         className={`lco-dash-context-fill lco-dash-context-fill--${healthLevel}`}
-                        style={{ width: `${Math.min(contextPct, 100)}%` }}
+                        style={{ transform: `scaleX(${safePct / 100})` }}
                     />
                 </div>
-                <span className="lco-dash-context-label">{Math.round(contextPct)}% context</span>
+                <span className="lco-dash-context-label">{Math.round(safePct)}% context</span>
             </div>
 
             <div className="lco-dash-active-stats">

@@ -1,6 +1,6 @@
 /* entrypoints/sidepanel/dashboard.css
    Side panel dashboard styles. Uses CSS custom properties for theming.
-   Matches the overlay's warm orange accent and neutral palette. */
+   Claude-aligned: warm terra cotta accent, Pampas palette, minimal. */
 
 /* ── Reset & Variables ──────────────────────────────────────────────────────── */
 
@@ -12,12 +12,12 @@
     --lco-text-secondary: #6b6b6b;
     --lco-text-muted: #a0a0a0;
     --lco-border: #e5e3df;
-    --lco-accent: #d4956a;
-    --lco-accent-light: rgba(212, 149, 106, 0.12);
+    --lco-accent: #c15f3c;
+    --lco-accent-light: rgba(193, 95, 60, 0.10);
     --lco-health-green: #4caf50;
     --lco-health-yellow: #f5a623;
     --lco-health-red: #e53935;
-    --lco-context-fill: #d4956a;
+    --lco-context-fill: #c15f3c;
     --lco-context-track: #e5e3df;
     --lco-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     --lco-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
@@ -35,8 +35,8 @@
         --lco-text-secondary: #a0a0a0;
         --lco-text-muted: #6b6b6b;
         --lco-border: #333333;
-        --lco-accent: #d4956a;
-        --lco-accent-light: rgba(212, 149, 106, 0.15);
+        --lco-accent: #c15f3c;
+        --lco-accent-light: rgba(193, 95, 60, 0.15);
         --lco-context-track: #333333;
     }
 }
@@ -54,6 +54,7 @@ body {
     color: var(--lco-text);
     background: var(--lco-bg);
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* ── Dashboard container ────────────────────────────────────────────────────── */
@@ -68,6 +69,18 @@ body {
     text-align: center;
     color: var(--lco-text-muted);
     padding: 40px 0;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+
+.lco-dash ::-webkit-scrollbar { width: 6px; }
+.lco-dash ::-webkit-scrollbar-track { background: transparent; }
+.lco-dash ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.12); border-radius: 3px; }
+.lco-dash ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.2); }
+
+@media (prefers-color-scheme: dark) {
+    .lco-dash ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); }
+    .lco-dash ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
 }
 
 /* ── Header ─────────────────────────────────────────────────────────────────── */
@@ -131,6 +144,11 @@ body {
     background: var(--lco-bg-hover);
 }
 
+.lco-dash-section-header:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+
 .lco-dash-arrow {
     font-size: 8px;
     color: var(--lco-text-muted);
@@ -163,6 +181,29 @@ body {
     padding: 4px 0 8px;
 }
 
+/* ── Loading skeleton ──────────────────────────────────────────────────────── */
+
+@keyframes lco-shimmer {
+    0%   { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+.lco-dash-skeleton {
+    height: 16px;
+    background: linear-gradient(90deg,
+        var(--lco-bg-card) 25%,
+        var(--lco-bg-hover) 50%,
+        var(--lco-bg-card) 75%
+    );
+    background-size: 200% 100%;
+    animation: lco-shimmer 1.5s ease infinite;
+    border-radius: var(--lco-radius-sm);
+}
+
+.lco-dash-skeleton--wide { width: 80%; }
+.lco-dash-skeleton--narrow { width: 50%; }
+.lco-dash-skeleton--card { height: 64px; border-radius: var(--lco-radius); }
+
 /* ── Today card ─────────────────────────────────────────────────────────────── */
 
 .lco-dash-today {
@@ -183,6 +224,18 @@ body {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lco-dash-metric:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+    .lco-dash-metric:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
 }
 
 .lco-dash-metric-value {
@@ -207,7 +260,9 @@ body {
     border: 1px solid var(--lco-border);
     border-radius: var(--lco-radius);
     padding: 12px;
-    transition: opacity 150ms ease;
+    /* GPU-accelerated: only transform + opacity for 60/120fps compositing. */
+    will-change: transform, opacity;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
 }
 
 .lco-dash-active--empty {
@@ -216,17 +271,20 @@ body {
 
 .lco-dash-active--hidden {
     opacity: 0;
+    transform: translateY(6px) scale(0.97);
 }
 
 .lco-dash-active--visible {
     opacity: 1;
+    transform: translateY(0) scale(1);
 }
 
 .lco-dash-placeholder {
     color: var(--lco-text-muted);
     text-align: center;
-    padding: 8px 0;
+    padding: 12px 0;
     font-size: 12px;
+    font-style: italic;
 }
 
 .lco-dash-active-header {
@@ -241,11 +299,12 @@ body {
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
+    /* No transition: health state changes snap instantly (rare, not per-frame). */
 }
 
-.lco-dash-health-dot--healthy { background: var(--lco-health-green); }
-.lco-dash-health-dot--degrading { background: var(--lco-health-yellow); }
-.lco-dash-health-dot--critical { background: var(--lco-health-red); }
+.lco-dash-health-dot--healthy   { background: var(--lco-health-green); box-shadow: 0 0 4px rgba(76, 175, 80, 0.4); }
+.lco-dash-health-dot--degrading { background: var(--lco-health-yellow); box-shadow: 0 0 4px rgba(245, 166, 35, 0.4); }
+.lco-dash-health-dot--critical  { background: var(--lco-health-red); box-shadow: 0 0 4px rgba(229, 57, 53, 0.4); }
 
 .lco-dash-health-label {
     font-size: 12px;
@@ -277,14 +336,19 @@ body {
 }
 
 .lco-dash-context-fill {
+    width: 100%;
     height: 100%;
     border-radius: 3px;
-    transition: width 300ms ease;
+    transform-origin: left center;
+    transform: scaleX(0);
+    will-change: transform;
+    /* scaleX is compositor-only: no layout, no paint, native 60/120fps. */
+    transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.lco-dash-context-fill--healthy { background: var(--lco-health-green); }
-.lco-dash-context-fill--degrading { background: var(--lco-health-yellow); }
-.lco-dash-context-fill--critical { background: var(--lco-health-red); }
+.lco-dash-context-fill--healthy   { background: var(--lco-health-green); box-shadow: 0 0 4px rgba(76, 175, 80, 0.3); }
+.lco-dash-context-fill--degrading { background: var(--lco-health-yellow); box-shadow: 0 0 4px rgba(245, 166, 35, 0.3); }
+.lco-dash-context-fill--critical  { background: var(--lco-health-red); box-shadow: 0 0 4px rgba(229, 57, 53, 0.3); }
 
 .lco-dash-context-label {
     font-size: 11px;
@@ -309,7 +373,7 @@ body {
 }
 
 .lco-dash-convlist--empty {
-    padding: 12px 0;
+    padding: 16px 0;
 }
 
 .lco-dash-conv-item {
@@ -317,12 +381,20 @@ body {
     border-radius: var(--lco-radius);
     border: 1px solid var(--lco-border);
     background: var(--lco-bg-card);
-    transition: background var(--lco-transition);
+    transition: background var(--lco-transition), transform 0.15s ease, box-shadow 0.15s ease;
     animation: lco-dash-slide-in 200ms ease both;
 }
 
 .lco-dash-conv-item:hover {
     background: var(--lco-bg-hover);
+    transform: translateY(-0.5px);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+@media (prefers-color-scheme: dark) {
+    .lco-dash-conv-item:hover {
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
 }
 
 .lco-dash-conv-top {
@@ -395,8 +467,15 @@ body {
     }
     .lco-dash-conv-item {
         animation: none;
+        transition: none;
     }
     .lco-dash-context-fill {
         transition: none;
+    }
+    .lco-dash-metric {
+        transition: none;
+    }
+    .lco-dash-skeleton {
+        animation: none;
     }
 }
