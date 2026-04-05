@@ -44,8 +44,8 @@ export function useDashboardData(): DashboardData {
             // has not fired yet today (avoids the "all zeros" cold-start bug).
             const summary = await getDailySummary(date) ?? await computeDailySummary(date);
             setToday(summary);
-        } catch {
-            // First use of the day: no summary yet.
+        } catch (err) {
+            console.error('[Saar] Failed to load daily summary:', err);
         }
     }, []);
 

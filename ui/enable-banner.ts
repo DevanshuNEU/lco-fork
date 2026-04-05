@@ -20,7 +20,8 @@ export async function showEnableBanner(): Promise<void> {
             to   { opacity: 1; transform: translateY(0);    }
         }
         @media (prefers-reduced-motion: reduce) {
-            #lco-enable-banner { animation: none !important; }
+            #lco-enable-banner { animation: none !important; transition: none !important; }
+            #lco-enable-banner button { transition: none !important; transform: none !important; }
         }
     `;
     document.documentElement.appendChild(style);
@@ -51,7 +52,7 @@ export async function showEnableBanner(): Promise<void> {
     ].join(';');
 
     const text = document.createElement('span');
-    text.textContent = 'Saar \u2014 Enable token tracking for Claude?';
+    text.textContent = 'Saar: Enable token tracking for Claude?';
 
     const enableBtn = document.createElement('button');
     enableBtn.textContent = 'Enable';
@@ -88,13 +89,16 @@ export async function showEnableBanner(): Promise<void> {
     banner.appendChild(dismissBtn);
     document.documentElement.appendChild(banner);
 
-    // Active state: press feedback.
-    enableBtn.addEventListener('mousedown', () => { enableBtn.style.transform = 'scale(0.97)'; });
-    enableBtn.addEventListener('mouseup', () => { enableBtn.style.transform = ''; });
-    enableBtn.addEventListener('mouseleave', () => { enableBtn.style.transform = ''; });
-    dismissBtn.addEventListener('mousedown', () => { dismissBtn.style.transform = 'scale(0.97)'; });
-    dismissBtn.addEventListener('mouseup', () => { dismissBtn.style.transform = ''; });
-    dismissBtn.addEventListener('mouseleave', () => { dismissBtn.style.transform = ''; });
+    // Active state: press feedback. Skip when reduced motion is preferred.
+    const motionOk = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (motionOk) {
+        enableBtn.addEventListener('mousedown', () => { enableBtn.style.transform = 'scale(0.97)'; });
+        enableBtn.addEventListener('mouseup', () => { enableBtn.style.transform = ''; });
+        enableBtn.addEventListener('mouseleave', () => { enableBtn.style.transform = ''; });
+        dismissBtn.addEventListener('mousedown', () => { dismissBtn.style.transform = 'scale(0.97)'; });
+        dismissBtn.addEventListener('mouseup', () => { dismissBtn.style.transform = ''; });
+        dismissBtn.addEventListener('mouseleave', () => { dismissBtn.style.transform = ''; });
+    }
 
     // Hover states.
     enableBtn.addEventListener('mouseenter', () => { enableBtn.style.background = '#a84f2f'; });
