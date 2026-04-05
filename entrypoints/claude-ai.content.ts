@@ -146,16 +146,28 @@ async function initializeMonitoring(): Promise<void> {
 
         const msg = event.data as LcoBridgeMessage;
 
-        // Capture organization ID from the bridge. inject.ts extracts it from
-        // the API URL on every request. Once set, it persists for this page load.
-        // On the first message that carries an org ID, re-send SET_ACTIVE_CONV so
-        // the background writes activeOrg_{tabId} and the side panel can query
-        // account-scoped data. The initial SET_ACTIVE_CONV at page load fires before
-        // any API call, so it has organizationId: null.
-        if ('organizationId' in msg && typeof msg.organizationId === 'string') {
+        // ORGANIZATION_DETECTED fires on page load from the first API call
+        // (before any user message). This gives us the account scope immediately.
+        if (msg.type === 'ORGANIZATION_DETECTED') {
             const wasNull = currentOrgId === null;
             currentOrgId = msg.organizationId;
-            if (wasNull && currentConversationId) {
+            if (wasNull) {
+                // Re-send SET_ACTIVE_CONV with the now-known org ID so the
+                // side panel can scope its queries to this account.
+                browser.runtime.sendMessage({
+                    type: 'SET_ACTIVE_CONV',
+                    organizationId: currentOrgId,
+                    conversationId: currentConversationId,
+                } satisfies SetActiveConvMessage).catch(() => {});
+            }
+            return; // ORGANIZATION_DETECTED is handled; no further processing.
+        }
+
+        // Also capture org ID from TOKEN_BATCH/STREAM_COMPLETE as a fallback
+        // in case ORGANIZATION_DETECTED was missed (e.g., inject.ts loaded late).
+        if ('organizationId' in msg && typeof msg.organizationId === 'string' && currentOrgId === null) {
+            currentOrgId = msg.organizationId;
+            if (currentConversationId) {
                 browser.runtime.sendMessage({
                     type: 'SET_ACTIVE_CONV',
                     organizationId: currentOrgId,

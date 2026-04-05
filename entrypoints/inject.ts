@@ -80,11 +80,15 @@ export default defineUnlistedScript(() => {
         // can be fired the next time a stream completes cleanly.
         let _lastStreamFailed = false;
 
+        // Tracks whether we have already posted the ORGANIZATION_DETECTED message.
+        // Fires once per page load on the first fetch to /api/organizations/.
+        let _orgDetected = false;
+
         // Secure Bridge: postMessage with LCO_V1 namespace + session token
         // Messages are batched every 200ms to avoid saturating the bridge.
         // Never uses '*' as targetOrigin; always scoped to the current origin.
         function postSecureBatch(payload: {
-            type: 'TOKEN_BATCH' | 'STREAM_COMPLETE' | 'HEALTH_BROKEN' | 'HEALTH_RECOVERED' | 'MESSAGE_LIMIT_UPDATE';
+            type: 'TOKEN_BATCH' | 'STREAM_COMPLETE' | 'HEALTH_BROKEN' | 'HEALTH_RECOVERED' | 'MESSAGE_LIMIT_UPDATE' | 'ORGANIZATION_DETECTED';
             inputTokens?: number;
             outputTokens?: number;
             model?: string;
@@ -493,6 +497,22 @@ export default defineUnlistedScript(() => {
                     : input instanceof URL
                         ? input.href
                         : (input as Request)?.url ?? '';
+
+            // Detect the org ID from any API call (not just completions).
+            // Claude.ai makes dozens of fetches on page load (conversations list,
+            // settings, etc.) that all go through /api/organizations/{orgId}/.
+            // Posting ORGANIZATION_DETECTED immediately gives the content script
+            // the account scope before the user sends their first message.
+            if (!_orgDetected && url.includes('/api/organizations/')) {
+                const earlyOrgId = extractOrgId(url);
+                if (earlyOrgId) {
+                    _orgDetected = true;
+                    postSecureBatch({
+                        type: 'ORGANIZATION_DETECTED',
+                        organizationId: earlyOrgId,
+                    });
+                }
+            }
 
             if (isCompletionEndpoint(url)) {
                 const { model, prompt } = extractModelAndPromptFromInit(init);

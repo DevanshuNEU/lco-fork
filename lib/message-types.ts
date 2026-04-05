@@ -78,8 +78,17 @@ export interface MessageLimitPayload {
     messageLimitUtilization: number;
 }
 
+/** Fired once per page load when the org ID is first detected from any API call. */
+export interface OrganizationDetectedPayload {
+    namespace: typeof LCO_NAMESPACE;
+    type: 'ORGANIZATION_DETECTED';
+    token: string;
+    platform: string;
+    organizationId: string;
+}
+
 /** Union of all valid bridge message types */
-export type LcoBridgeMessage = TokenBatchPayload | StreamCompletePayload | StreamHealthBrokenPayload | StreamHealthRecoveredPayload | MessageLimitPayload;
+export type LcoBridgeMessage = TokenBatchPayload | StreamCompletePayload | StreamHealthBrokenPayload | StreamHealthRecoveredPayload | MessageLimitPayload | OrganizationDetectedPayload;
 
 // Tab Storage Schema (chrome.storage.session)
 
