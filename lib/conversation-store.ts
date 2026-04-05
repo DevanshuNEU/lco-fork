@@ -401,8 +401,27 @@ export async function listConversations(
     limit: number,
     offset: number = 0,
 ): Promise<ConversationRecord[]> {
-    const idxKey = convIndexKey(accountId);
-    const index = await readIndex(idxKey);
+    let idxKey = convIndexKey(accountId);
+    let index = await readIndex(idxKey);
+
+    // Legacy migration: if the account-scoped index is empty, check the old
+    // global index and migrate all entries to the new scoped index + keys.
+    if (index.length === 0) {
+        const legacyIndex = await readIndex(LEGACY_CONV_INDEX_KEY);
+        if (legacyIndex.length > 0) {
+            for (const id of legacyIndex) {
+                const oldKey = legacyConvKey(id);
+                const oldData = await store().get(oldKey);
+                const record = oldData[oldKey] as ConversationRecord | undefined;
+                if (record) {
+                    await store().set({ [convKey(accountId, id)]: record });
+                    await addToIndex(convIndexKey(accountId), id);
+                }
+            }
+            index = await readIndex(convIndexKey(accountId));
+        }
+    }
+
     const slice = index.slice(offset, offset + limit);
     if (slice.length === 0) return [];
 

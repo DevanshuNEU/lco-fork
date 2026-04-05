@@ -113,7 +113,11 @@ export function useDashboardData(): DashboardData {
                 await loadActiveConversation(tab.id);
             }
 
-            await Promise.all([loadToday(), loadConversations()]);
+            // loadConversations first: it triggers bulk legacy migration if
+            // the account-scoped index is empty. loadToday depends on migrated
+            // conversation records to compute the daily summary correctly.
+            await loadConversations();
+            await loadToday();
             setLoading(false);
         }
 
