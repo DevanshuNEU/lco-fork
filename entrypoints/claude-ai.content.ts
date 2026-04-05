@@ -148,8 +148,20 @@ async function initializeMonitoring(): Promise<void> {
 
         // Capture organization ID from the bridge. inject.ts extracts it from
         // the API URL on every request. Once set, it persists for this page load.
+        // On the first message that carries an org ID, re-send SET_ACTIVE_CONV so
+        // the background writes activeOrg_{tabId} and the side panel can query
+        // account-scoped data. The initial SET_ACTIVE_CONV at page load fires before
+        // any API call, so it has organizationId: null.
         if ('organizationId' in msg && typeof msg.organizationId === 'string') {
+            const wasNull = currentOrgId === null;
             currentOrgId = msg.organizationId;
+            if (wasNull && currentConversationId) {
+                browser.runtime.sendMessage({
+                    type: 'SET_ACTIVE_CONV',
+                    organizationId: currentOrgId,
+                    conversationId: currentConversationId,
+                } satisfies SetActiveConvMessage).catch(() => {});
+            }
         }
 
         if (msg.type === 'TOKEN_BATCH') {
