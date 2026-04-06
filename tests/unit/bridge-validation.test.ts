@@ -277,3 +277,46 @@ describe('MESSAGE_LIMIT_UPDATE', () => {
         })).toBe(false);
     });
 });
+
+// ── ORGANIZATION_DETECTED ─────────────────────────────────────────────────────
+
+describe('ORGANIZATION_DETECTED', () => {
+    it('accepts a valid ORGANIZATION_DETECTED message', () => {
+        expect(isValidBridgeSchema({
+            namespace: LCO_NAMESPACE,
+            token: 'tok',
+            type: 'ORGANIZATION_DETECTED',
+            organizationId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+            platform: 'claude.ai',
+        })).toBe(true);
+    });
+
+    it('rejects ORGANIZATION_DETECTED with missing organizationId', () => {
+        expect(isValidBridgeSchema({
+            namespace: LCO_NAMESPACE,
+            token: 'tok',
+            type: 'ORGANIZATION_DETECTED',
+            platform: 'claude.ai',
+        })).toBe(false);
+    });
+
+    it('rejects ORGANIZATION_DETECTED with empty string organizationId', () => {
+        expect(isValidBridgeSchema({
+            namespace: LCO_NAMESPACE,
+            token: 'tok',
+            type: 'ORGANIZATION_DETECTED',
+            organizationId: '',
+            platform: 'claude.ai',
+        })).toBe(false);
+    });
+
+    it('rejects ORGANIZATION_DETECTED with non-string organizationId', () => {
+        expect(isValidBridgeSchema({
+            namespace: LCO_NAMESPACE,
+            token: 'tok',
+            type: 'ORGANIZATION_DETECTED',
+            organizationId: 42,
+            platform: 'claude.ai',
+        })).toBe(false);
+    });
+});

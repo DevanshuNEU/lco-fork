@@ -666,3 +666,103 @@ describe('legacy data migration', () => {
         expect(result!.totalInputTokens).toBe(999); // new key wins
     });
 });
+
+// ── Legacy fallback via listConversations ─────────────────────────────────────
+
+describe('legacy fallback via listConversations', () => {
+    function makeLegacyRecord(id: string, inputTokens: number): ConversationRecord {
+        return {
+            id,
+            startedAt: 1000,
+            lastActiveAt: 2000,
+            finalized: false,
+            turnCount: 1,
+            totalInputTokens: inputTokens,
+            totalOutputTokens: 50,
+            peakContextPct: 5,
+            lastContextPct: 5,
+            model: 'claude-sonnet-4-6',
+            estimatedCost: 0.001,
+            turns: [],
+            dna: { subject: '', lastContext: '', hints: [] },
+            _v: 1,
+        };
+    }
+
+    it('returns legacy records when the scoped index is empty', async () => {
+        mockStore._raw['convIndex'] = ['leg-a', 'leg-b'];
+        mockStore._raw['conv:leg-a'] = makeLegacyRecord('leg-a', 100);
+        mockStore._raw['conv:leg-b'] = makeLegacyRecord('leg-b', 200);
+
+        const results = await listConversations(TEST_ORG, 10);
+        expect(results).toHaveLength(2);
+        expect(results.map(r => r.id)).toContain('leg-a');
+        expect(results.map(r => r.id)).toContain('leg-b');
+    });
+
+    it('does not migrate legacy records to the scoped index', async () => {
+        mockStore._raw['convIndex'] = ['leg-c'];
+        mockStore._raw['conv:leg-c'] = makeLegacyRecord('leg-c', 300);
+
+        await listConversations(TEST_ORG, 10);
+
+        // No bulk migration: scoped index must remain absent.
+        expect(mockStore._raw[`convIndex:${TEST_ORG}`]).toBeUndefined();
+        // Legacy index untouched.
+        expect(mockStore._raw['convIndex']).toEqual(['leg-c']);
+    });
+
+    it('both accounts can read the same legacy records independently', async () => {
+        const ORG_A = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa';
+        const ORG_B = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
+        mockStore._raw['convIndex'] = ['shared-leg'];
+        mockStore._raw['conv:shared-leg'] = makeLegacyRecord('shared-leg', 500);
+
+        const listA = await listConversations(ORG_A, 10);
+        const listB = await listConversations(ORG_B, 10);
+        expect(listA).toHaveLength(1);
+        expect(listB).toHaveLength(1);
+    });
+});
+
+// ── extractOrgId parity (mirrors inject.ts inline function) ──────────────────
+
+describe('extractOrgId parity', () => {
+    // Inline copy of extractOrgId from entrypoints/inject.ts.
+    // Both implementations must produce identical output. When one diverges,
+    // this test breaks and forces the developer to keep them in sync.
+    // mirrors extractOrgId in entrypoints/inject.ts
+    function extractOrgIdInject(url: string): string | null {
+        const m = url.match(/\/organizations\/([0-9a-f-]+)\//i);
+        return m ? m[1].toLowerCase() : null;
+    }
+
+    const TEST_URLS = [
+        'https://claude.ai/api/organizations/a1b2c3d4-e5f6-7890-abcd-ef1234567890/chat_conversations/c/completion',
+        'https://claude.ai/api/organizations/aabb1122-ccdd-3344-eeff-556677889900/settings',
+        'https://claude.ai/chat/abc-123',
+        '',
+    ];
+
+    for (const url of TEST_URLS) {
+        it(`lib and inject agree for: ${url.slice(-60) || '(empty string)'}`, () => {
+            expect(extractOrganizationId(url)).toBe(extractOrgIdInject(url));
+        });
+    }
+});
+
+// ── Key builder validation: empty accountId throws ────────────────────────────
+
+describe('empty accountId throws', () => {
+    it('recordTurn rejects empty string accountId', async () => {
+        await expect(
+            recordTurn('', 'conv-x', makeTurn()),
+        ).rejects.toThrow('[LCO] accountId required for scoped storage key');
+    });
+
+    it('getConversation rejects empty string accountId', async () => {
+        await expect(
+            getConversation('', 'conv-x'),
+        ).rejects.toThrow('[LCO] accountId required for scoped storage key');
+    });
+});
