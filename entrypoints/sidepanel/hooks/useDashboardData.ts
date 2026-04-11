@@ -41,6 +41,21 @@ const CONVERSATION_LIMIT = 20;
 // ── Tab URL gate ──────────────────────────────────────────────────────────────
 
 /**
+ * Returns true if the given URL string belongs to the Claude web app.
+ *
+ * Uses the URL constructor for exact hostname comparison, not a substring search.
+ * A substring check (`url.includes('claude.ai')`) would false-positive on domains
+ * like `notclaude.ai` or query strings containing `claude.ai`. Hostname comparison
+ * is immune to both.
+ *
+ * Returns false for any non-parseable string (the URL constructor throws on
+ * invalid input, which the caller's try/catch catches).
+ */
+function isClaudeUrl(url: string): boolean {
+    return new URL(url).hostname === CLAUDE_DOMAIN;
+}
+
+/**
  * Returns true if the tab identified by tabId is currently showing a claude.ai page.
  *
  * This is the single gate for all live data loading (Usage Budget, and any future
@@ -48,8 +63,8 @@ const CONVERSATION_LIMIT = 20;
  * that fetches live data should call this before loading.
  *
  * Returns false if the tab does not exist, if the URL is undefined (e.g. chrome://
- * pages where the extension has no URL access), or if chrome.tabs.get throws for
- * any reason.
+ * pages where the extension has no URL access), if the URL is not parseable, or if
+ * chrome.tabs.get throws for any reason.
  *
  * @param tabId - Chrome tab ID to check.
  * @returns Promise that resolves to true only when the tab is on claude.ai.
@@ -57,9 +72,10 @@ const CONVERSATION_LIMIT = 20;
 export async function isTabOnClaude(tabId: number): Promise<boolean> {
     try {
         const tab = await chrome.tabs.get(tabId);
-        return tab.url?.includes(CLAUDE_DOMAIN) ?? false;
+        if (!tab.url) return false;
+        return isClaudeUrl(tab.url);
     } catch {
-        // Tab closed, extension lacks permission for that URL, or API unavailable.
+        // Tab closed, extension lacks URL permission, or URL string is not parseable.
         return false;
     }
 }
@@ -326,7 +342,9 @@ export function useDashboardData(): DashboardData {
             // changeInfo.url is only present when the URL actually changed.
             if (!changeInfo.url) return;
 
-            const onClaude = changeInfo.url.includes(CLAUDE_DOMAIN);
+            // Use isClaudeUrl (hostname comparison) for the same reason as isTabOnClaude:
+            // a substring check would false-positive on domains like notclaude.ai.
+            const onClaude = isClaudeUrl(changeInfo.url);
             applyIsClaudeTab(onClaude);
 
             if (onClaude) {

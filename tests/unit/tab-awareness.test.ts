@@ -10,14 +10,17 @@
 //   chrome.tabs.get(tabId) -> Tab -- returns a Tab object with a .url property.
 //
 // Test matrix:
-//   - claude.ai URL (full page path)     -> true
-//   - claude.ai URL (bare domain)        -> true
-//   - non-Claude URL (gmail.com)         -> false
-//   - non-Claude URL (github.com)        -> false
-//   - chrome:// URL (undefined in MV3)   -> false
-//   - tab.url is undefined               -> false
-//   - chrome.tabs.get throws             -> false (tab closed or no permission)
-//   - tabId 0 edge case                  -> delegates to chrome.tabs.get normally
+//   - claude.ai URL (full page path)        -> true
+//   - claude.ai URL (bare domain)           -> true
+//   - non-Claude URL (gmail.com)            -> false
+//   - non-Claude URL (github.com)           -> false
+//   - notclaude.ai (substring trap)         -> false  (would be true with includes())
+//   - subdomain of claude.ai                -> false  (exact hostname match only)
+//   - URL containing claude.ai in path      -> false  (hostname is not claude.ai)
+//   - chrome:// URL (undefined in MV3)      -> false
+//   - tab.url is undefined                  -> false
+//   - chrome.tabs.get throws                -> false (tab closed or no permission)
+//   - tabId 0 edge case                     -> delegates to chrome.tabs.get normally
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { isTabOnClaude } from '../../entrypoints/sidepanel/hooks/useDashboardData';
@@ -95,10 +98,28 @@ describe('isTabOnClaude -- non-Claude URLs return false', () => {
         expect(await isTabOnClaude(1)).toBe(false);
     });
 
-    it('returns false for a URL that contains "claude" but not "claude.ai"', async () => {
-        // Ensures we are matching the domain, not a path segment named "claude".
+    it('returns false for notclaude.ai (the includes() substring trap)', async () => {
+        // notclaude.ai contains the substring "claude.ai", so a naive includes()
+        // check would return true. Hostname comparison returns false correctly.
         mockTabsGet.mockResolvedValueOnce(
-            mockTab('https://example.com/compare-claude-vs-gpt'),
+            mockTab('https://notclaude.ai/'),
+        );
+        expect(await isTabOnClaude(1)).toBe(false);
+    });
+
+    it('returns false for a subdomain of claude.ai (exact hostname match only)', async () => {
+        // api.claude.ai is not a user-navigable page. Only the root claude.ai
+        // domain hosts the web UI. Subdomains are excluded by design.
+        mockTabsGet.mockResolvedValueOnce(
+            mockTab('https://api.claude.ai/path'),
+        );
+        expect(await isTabOnClaude(1)).toBe(false);
+    });
+
+    it('returns false for a URL with claude.ai only in the path, not the hostname', async () => {
+        // Ensures we are matching the hostname, not any part of the URL string.
+        mockTabsGet.mockResolvedValueOnce(
+            mockTab('https://example.com/redirect?to=https://claude.ai'),
         );
         expect(await isTabOnClaude(1)).toBe(false);
     });
