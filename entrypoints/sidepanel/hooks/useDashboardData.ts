@@ -58,9 +58,8 @@ function isClaudeUrl(url: string): boolean {
 /**
  * Returns true if the tab identified by tabId is currently showing a claude.ai page.
  *
- * This is the single gate for all live data loading (Usage Budget, and any future
- * per-tab features like pre-submit estimates or delta tracking). Every new feature
- * that fetches live data should call this before loading.
+ * This is the single gate for all live data loading in the dashboard. Call this
+ * before loading any data that requires an active Claude session.
  *
  * Returns false if the tab does not exist, if the URL is undefined (e.g. chrome://
  * pages where the extension has no URL access), if the URL is not parseable, or if
@@ -91,13 +90,8 @@ export interface DashboardData {
     /**
      * True when the currently active tab is on claude.ai.
      *
-     * Use this flag to gate any interactive element or data loader that depends on
-     * an active Claude session (Usage Budget, pre-submit estimates, delta tracking,
-     * efficiency score refresh, etc.). Historical data (today, conversations) is
-     * always valid regardless of this flag.
-     *
-     * Pattern for future features:
-     *   if (!isClaudeTab) return; // disable the control or skip the fetch
+     * Gate any data loader that requires an active Claude session on this flag.
+     * Historical data (today, conversations) is always valid regardless of its value.
      */
     isClaudeTab: boolean;
     loading: boolean;
@@ -217,6 +211,10 @@ export function useDashboardData(): DashboardData {
             const orgId = orgIdRef.current;
             if (!orgId) return;
             const limits = await getUsageLimits(orgId);
+            // Stale-check: the org may have changed while getUsageLimits was in flight
+            // (account switch, logout, tab change). Applying stale data from the old org
+            // would overwrite the correct cleared or newly-loaded state. Discard it.
+            if (orgIdRef.current !== orgId) return;
             if (!limits) {
                 setBudget(null);
                 return;
@@ -234,7 +232,8 @@ export function useDashboardData(): DashboardData {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
             let onClaude = false;
-            if (tab?.id) {
+            // typeof check instead of truthy: tabId 0 is falsy but is a valid Chrome tab ID.
+            if (typeof tab?.id === 'number') {
                 tabIdRef.current = tab.id;
                 onClaude = await isTabOnClaude(tab.id);
                 applyIsClaudeTab(onClaude);
