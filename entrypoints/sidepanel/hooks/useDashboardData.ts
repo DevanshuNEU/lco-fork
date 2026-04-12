@@ -159,6 +159,24 @@ export function useDashboardData(): DashboardData {
         }
     }, []);
 
+    const loadTokenEconomics = useCallback(async () => {
+        const orgId = orgIdRef.current;
+        if (!orgId) {
+            // Org cleared (logout or not yet known): wipe any stale economics
+            // from the previous account so no cross-account data leaks through.
+            setTokenEconomics(null);
+            return;
+        }
+        try {
+            const deltas = await getUsageDeltas(orgId);
+            // computeTokenEconomics filters models below MIN_SAMPLES internally.
+            // Returns empty Maps when not enough data exists yet.
+            setTokenEconomics(computeTokenEconomics(deltas));
+        } catch {
+            // Non-critical: token economics panel just stays empty.
+        }
+    }, []);
+
     const loadActiveConversation = useCallback(async (tabId: number) => {
         try {
             // Read the active conversation and org ID for this tab from session storage.
@@ -204,16 +222,17 @@ export function useDashboardData(): DashboardData {
                 setActiveHealth(null);
             }
 
-            // Account switched: reload history and today for the new org.
+            // Account switched: reload history, today, and token economics for the new org.
             if (orgChanged) {
                 loadConversations();
                 loadToday();
+                loadTokenEconomics();
             }
         } catch {
             setActiveConv(null);
             setActiveHealth(null);
         }
-    }, [loadConversations, loadToday]);
+    }, [loadConversations, loadToday, loadTokenEconomics]);
 
     const loadBudget = useCallback(async () => {
         try {
@@ -231,24 +250,6 @@ export function useDashboardData(): DashboardData {
             setBudget(computeUsageBudget(limits, Date.now()));
         } catch {
             // Dashboard shows nothing rather than crash.
-        }
-    }, []);
-
-    const loadTokenEconomics = useCallback(async () => {
-        const orgId = orgIdRef.current;
-        if (!orgId) {
-            // Org cleared (logout or not yet known): wipe any stale economics
-            // from the previous account so no cross-account data leaks through.
-            setTokenEconomics(null);
-            return;
-        }
-        try {
-            const deltas = await getUsageDeltas(orgId);
-            // computeTokenEconomics filters models below MIN_SAMPLES internally.
-            // Returns empty Maps when not enough data exists yet.
-            setTokenEconomics(computeTokenEconomics(deltas));
-        } catch {
-            // Non-critical: token economics panel just stays empty.
         }
     }, []);
 

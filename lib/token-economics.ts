@@ -4,8 +4,7 @@
 // Architecture position: lib/ agent layer. Pure functions only — no DOM, no chrome.*, no storage.
 // Input:  UsageDelta[] from getUsageDeltas() in lib/conversation-store.ts
 // Output: TokenEconomicsResult (two Maps keyed by model string)
-// Called by: nothing at runtime yet. Exists for LCO-35 (pre-submit intelligence)
-//            and LCO-36 (efficiency score). Wire it in the content script when those ship.
+// Called by: entrypoints/sidepanel/hooks/useDashboardData.ts (loadTokenEconomics)
 //
 // Why this exists: each model consumes session limit at a different rate. Knowing the
 // median tokens-per-1% lets us predict how much session a draft message will cost before

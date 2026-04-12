@@ -286,7 +286,7 @@ export default defineBackground({
           completedAt: Date.now(),
           deltaUtilization: message.deltaUtilization,
         }, message.topicHint)
-          .then(() => {
+          .then(async () => {
             // Track the active conversation and org for this tab so tab-close can finalize it.
             if (tabId !== undefined) {
               browser.storage.session.set({
@@ -298,18 +298,24 @@ export default defineBackground({
             // Append to the per-account delta log for the Token Economics agent.
             // Only records with a valid positive delta are stored. Null deltas
             // (first load, session reset, fetch failure) are dropped here.
+            //
+            // Awaited before sendResponse: MV3 service workers can terminate once
+            // the message channel closes (after sendResponse). A fire-and-forget
+            // appendUsageDelta would be silently dropped if the worker idles first.
             if (message.deltaUtilization !== null && message.deltaUtilization > 0) {
-              appendUsageDelta(message.organizationId, {
-                conversationId: message.conversationId,
-                model: message.model,
-                inputTokens: message.inputTokens,
-                outputTokens: message.outputTokens,
-                deltaUtilization: message.deltaUtilization,
-                cost: message.cost,
-                timestamp: Date.now(),
-              }).catch(err => {
+              try {
+                await appendUsageDelta(message.organizationId, {
+                  conversationId: message.conversationId,
+                  model: message.model,
+                  inputTokens: message.inputTokens,
+                  outputTokens: message.outputTokens,
+                  deltaUtilization: message.deltaUtilization,
+                  cost: message.cost,
+                  timestamp: Date.now(),
+                });
+              } catch (err) {
                 console.error('[LCO-ERROR] Failed to append usage delta:', err);
-              });
+              }
             }
 
             sendResponse({ ok: true });
