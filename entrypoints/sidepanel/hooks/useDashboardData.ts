@@ -21,12 +21,14 @@ import {
     getConversation,
     listConversations,
     getUsageLimits,
+    getUsageDeltas,
     todayDateString,
     type DailySummary,
     type ConversationRecord,
 } from '../../../lib/conversation-store';
 import { computeHealthScore, computeGrowthRate, type HealthScore } from '../../../lib/health-score';
 import { computeUsageBudget } from '../../../lib/usage-budget';
+import { computeTokenEconomics, type TokenEconomicsResult } from '../../../lib/token-economics';
 import type { UsageBudgetResult } from '../../../lib/message-types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -94,6 +96,12 @@ export interface DashboardData {
      * Historical data (today, conversations) is always valid regardless of its value.
      */
     isClaudeTab: boolean;
+    /**
+     * Token economics derived from the per-account delta log.
+     * Null until enough delta records exist (MIN_SAMPLES per model).
+     * Maps model name to median tokens per 1% of session consumed.
+     */
+    tokenEconomics: TokenEconomicsResult | null;
     loading: boolean;
 }
 
@@ -106,6 +114,7 @@ export function useDashboardData(): DashboardData {
     const [conversations, setConversations] = useState<ConversationRecord[]>([]);
     const [budget, setBudget] = useState<UsageBudgetResult | null>(null);
     const [isClaudeTab, setIsClaudeTab] = useState(false);
+    const [tokenEconomics, setTokenEconomics] = useState<TokenEconomicsResult | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Track current tab ID so we know which activeConv_ key to watch.
@@ -150,6 +159,26 @@ export function useDashboardData(): DashboardData {
         }
     }, []);
 
+    const loadTokenEconomics = useCallback(async () => {
+        const orgId = orgIdRef.current;
+        if (!orgId) {
+            // Org cleared (logout or not yet known): wipe any stale economics
+            // from the previous account so no cross-account data leaks through.
+            setTokenEconomics(null);
+            return;
+        }
+        try {
+            const deltas = await getUsageDeltas(orgId);
+            // Stale-check: org may have changed while getUsageDeltas was in flight.
+            if (orgIdRef.current !== orgId) return;
+            // computeTokenEconomics filters models below MIN_SAMPLES internally.
+            // Returns empty Maps when not enough data exists yet.
+            setTokenEconomics(computeTokenEconomics(deltas));
+        } catch {
+            // Non-critical: token economics panel just stays empty.
+        }
+    }, []);
+
     const loadActiveConversation = useCallback(async (tabId: number) => {
         try {
             // Read the active conversation and org ID for this tab from session storage.
@@ -176,6 +205,8 @@ export function useDashboardData(): DashboardData {
                 if (!orgId && prevOrg) {
                     setToday(null);
                     setConversations([]);
+                    setBudget(null);
+                    setTokenEconomics(null);
                 }
                 return;
             }
@@ -195,16 +226,17 @@ export function useDashboardData(): DashboardData {
                 setActiveHealth(null);
             }
 
-            // Account switched: reload history and today for the new org.
+            // Account switched: reload history, today, and token economics for the new org.
             if (orgChanged) {
                 loadConversations();
                 loadToday();
+                loadTokenEconomics();
             }
         } catch {
             setActiveConv(null);
             setActiveHealth(null);
         }
-    }, [loadConversations, loadToday]);
+    }, [loadConversations, loadToday, loadTokenEconomics]);
 
     const loadBudget = useCallback(async () => {
         try {
@@ -253,12 +285,15 @@ export function useDashboardData(): DashboardData {
             if (onClaude) {
                 await loadBudget();
             }
-
+            // Token economics is non-blocking: fire after the main data loads.
+            // It requires enough delta records to be meaningful (MIN_SAMPLES per model),
+            // so it may return empty Maps on first load.
+            loadTokenEconomics();
             setLoading(false);
         }
 
         init();
-    }, [loadToday, loadConversations, loadActiveConversation, loadBudget]);
+    }, [loadToday, loadConversations, loadActiveConversation, loadBudget, loadTokenEconomics]);
 
     // ── Live subscriptions ────────────────────────────────────────────────────
 
@@ -274,6 +309,7 @@ export function useDashboardData(): DashboardData {
                 const hasConvChange = keys.some(k => k.startsWith('conv:') || k.startsWith('convIndex'));
                 const hasDailyChange = keys.some(k => k.startsWith('daily:'));
                 const hasBudgetChange = keys.some(k => k.startsWith('usageLimits:'));
+                const hasDeltaChange = keys.some(k => k.startsWith('usageDeltas:'));
 
                 if (hasConvChange) {
                     loadConversations();
@@ -289,6 +325,9 @@ export function useDashboardData(): DashboardData {
                 // this check the budget card would silently re-populate on a non-Claude tab.
                 if (hasBudgetChange && isClaudeTabRef.current) {
                     loadBudget();
+                }
+                if (hasDeltaChange) {
+                    loadTokenEconomics();
                 }
             }
 
@@ -377,7 +416,7 @@ export function useDashboardData(): DashboardData {
             chrome.tabs.onUpdated.removeListener(onTabUpdated);
             chrome.tabs.onRemoved.removeListener(onTabRemoved);
         };
-    }, [loadToday, loadConversations, loadActiveConversation, loadBudget]);
+    }, [loadToday, loadConversations, loadActiveConversation, loadBudget, loadTokenEconomics]);
 
-    return { today, activeConv, activeHealth, conversations, budget, isClaudeTab, loading };
+    return { today, activeConv, activeHealth, conversations, budget, isClaudeTab, tokenEconomics, loading };
 }
