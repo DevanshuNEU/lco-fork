@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/pre-submit.ts - draft cost prediction
 
 import {

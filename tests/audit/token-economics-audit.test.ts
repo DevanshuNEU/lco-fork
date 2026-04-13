@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/token-economics.ts - median calculation, sample gating
 
 import { computeTokenEconomics, MIN_SAMPLES, type TokenEconomicsResult } from '../../lib/token-economics';

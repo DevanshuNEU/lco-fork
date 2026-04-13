@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/conversation-store.ts - pure utility functions only (no storage)
 
 import {

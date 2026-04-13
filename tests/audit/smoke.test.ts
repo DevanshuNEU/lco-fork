@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Smoke test: validate that lib/ modules are importable and callable from the audit test directory.
 
 import { calculateCost, lookupModel, getContextWindowSize } from '../../lib/pricing';

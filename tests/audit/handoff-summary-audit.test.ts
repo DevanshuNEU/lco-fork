@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/handoff-summary.ts - continuation prompt generation
 
 import { buildHandoffSummary, deduplicateHints, type HandoffContext } from '../../lib/handoff-summary';

@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/delta-coaching.ts - burn rate, expensive message, cost trajectory
 
 import {

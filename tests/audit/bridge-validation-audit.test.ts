@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/bridge-validation.ts - security validation, prior audit HIGH-001 verification
 
 import { isValidBridgeSchema } from '../../lib/bridge-validation';

@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/prompt-analysis.ts - model tier classification, coaching signals
 
 import {
@@ -126,11 +128,10 @@ describe('analyzePrompt: model_suggestion', () => {
     });
 
     // Verify the "5x" claim: Opus input is $5/M, Haiku is $1/M -> 5x ratio
-    test('"5x lower cost" claim is accurate for input pricing', () => {
-        // Import pricing to verify
-        const { lookupModel } = require('../../lib/pricing');
-        const opus = lookupModel('claude-opus-4-6');
-        const haiku = lookupModel('claude-haiku-4-5');
+    test('"5x lower cost" claim is accurate for input pricing', async () => {
+        const { lookupModel } = await import('../../lib/pricing');
+        const opus = lookupModel('claude-opus-4-6')!;
+        const haiku = lookupModel('claude-haiku-4-5')!;
         const inputRatio = opus.inputCostPerToken / haiku.inputCostPerToken;
         expect(inputRatio).toBeCloseTo(5, 10);
     });

@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/health-score.ts - rule verification and boundary testing
 
 import {

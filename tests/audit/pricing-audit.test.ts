@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/pricing.ts - cost calculation accuracy, boundary behavior, floating point
 
 import { lookupModel, calculateCost, getContextWindowSize } from '../../lib/pricing';

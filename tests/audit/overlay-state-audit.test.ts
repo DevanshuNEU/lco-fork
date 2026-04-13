@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/overlay-state.ts - state reducer immutability and correctness
 
 import {

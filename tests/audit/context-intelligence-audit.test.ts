@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/context-intelligence.ts - threshold signals, growth, stale, project hint
 
 import {

@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/usage-budget.ts - zone classification, budget computation
 
 import { classifyZone, computeUsageBudget } from '../../lib/usage-budget';

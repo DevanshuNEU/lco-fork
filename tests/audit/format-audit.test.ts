@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: lib/format.ts - formatting edge cases
 
 import { formatTokens, formatCost, formatModel, formatRelativeTime } from '../../lib/format';

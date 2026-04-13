@@ -1,3 +1,5 @@
+import { describe, test, expect } from 'vitest';
+
 // Audit: Fuzz tests - adversarial and boundary inputs for all pure functions
 
 import { lookupModel, calculateCost, getContextWindowSize } from '../../lib/pricing';
