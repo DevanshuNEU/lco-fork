@@ -174,6 +174,7 @@ async function initializeMonitoring(): Promise<void> {
     // Compose box observer for pre-submit cost estimation.
     let composeBoxRef: HTMLElement | null = null;
     let composeObserver: MutationObserver | null = null;
+    let attachmentObserver: MutationObserver | null = null;
     let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Restore state from stored conversation record if one exists.
@@ -643,51 +644,23 @@ async function initializeMonitoring(): Promise<void> {
         }
     });
 
-    // ── Compose box observer for pre-submit cost estimation ────────────────
-    //
-    // Claude.ai uses ProseMirror with a contenteditable div. The content script
-    // finds it via CSS selectors, attaches an input listener (debounced 500ms),
-    // and calls the Pre-Submit Agent on each update. A MutationObserver on
-    // document.body handles the SPA's dynamic DOM: the compose box may not exist
-    // at document_start and is replaced on navigation.
+    // Compose box observer: finds ProseMirror editor, reads text + attachment
+    // card content from the parent form/fieldset, debounces pre-submit estimates.
 
-    function findComposeBox(): HTMLElement | null {
-        return document.querySelector<HTMLElement>('div.ProseMirror[contenteditable="true"]')
-            ?? document.querySelector<HTMLElement>('div[contenteditable="true"][data-placeholder]')
-            ?? null;
-    }
-
-    /**
-     * Read the total draft content: typed text + any pasted/attached content.
-     *
-     * Claude.ai shows large pastes as attachment cards above the compose box,
-     * outside the contenteditable. Reading only the contenteditable misses
-     * the bulk of the content. This function walks up to the compose area's
-     * parent container (the form or fieldset wrapping both the attachment cards
-     * and the editor) and reads all textContent from there.
-     *
-     * Falls back to the contenteditable text alone if no suitable parent is found.
-     */
-    function readComposeAreaText(box: HTMLElement): string {
-        // Walk up from the contenteditable to find the form container that
-        // holds both attachment cards and the editor. Claude.ai wraps the
-        // compose area in a <fieldset> or <form> element.
-        let parent: HTMLElement | null = box.parentElement;
-        for (let i = 0; i < 5 && parent; i++) {
-            const tag = parent.tagName.toLowerCase();
-            if (tag === 'fieldset' || tag === 'form') {
-                return parent.textContent ?? '';
-            }
-            parent = parent.parentElement;
+    function findFormParent(el: HTMLElement): HTMLElement | null {
+        let p: HTMLElement | null = el.parentElement;
+        for (let i = 0; i < 5 && p; i++) {
+            const t = p.tagName;
+            if (t === 'FIELDSET' || t === 'FORM') return p;
+            p = p.parentElement;
         }
-
-        // Fallback: just the contenteditable text.
-        return box.textContent ?? '';
+        return null;
     }
 
-    /** Run the pre-submit estimate for the current compose area content. */
-    function updateDraftEstimate(box: HTMLElement): void {
-        const text = readComposeAreaText(box);
+    function onComposeInput(): void {
+        if (!composeBoxRef) return;
+        const container = findFormParent(composeBoxRef);
+        const text = (container ?? composeBoxRef).textContent ?? '';
 
         if (text.length < 20) {
             if (draftDebounceTimer) { clearTimeout(draftDebounceTimer); draftDebounceTimer = null; }
@@ -700,74 +673,38 @@ async function initializeMonitoring(): Promise<void> {
 
         if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
         draftDebounceTimer = setTimeout(() => {
-            const estimate = computePreSubmitEstimate({
+            state = applyDraftEstimate(state, computePreSubmitEstimate({
                 draftCharCount: text.length,
                 model: convState.model || 'claude-sonnet-4-6',
                 pctPerInputToken: cachedPctPerInputToken,
                 currentSessionPct: lastKnownUtilization ?? 0,
-            });
-            state = applyDraftEstimate(state, estimate);
+            }));
             overlay.render(state);
         }, 500);
     }
 
-    function attachComposeListener(box: HTMLElement): void {
-        composeBoxRef = box;
-
-        // Listen for typed text changes in the contenteditable.
-        box.addEventListener('input', () => { updateDraftEstimate(box); });
-
-        // Also observe the compose area parent for attachment card changes.
-        // When the user pastes a large block, Claude.ai shows it as a card
-        // above the editor (outside the contenteditable). The input event on
-        // the editor does not fire for these; we need a MutationObserver on
-        // the parent container.
-        let attachmentParent: HTMLElement | null = box.parentElement;
-        for (let i = 0; i < 5 && attachmentParent; i++) {
-            const tag = attachmentParent.tagName.toLowerCase();
-            if (tag === 'fieldset' || tag === 'form') break;
-            attachmentParent = attachmentParent.parentElement;
-        }
-        if (attachmentParent && attachmentParent !== box) {
-            const attachmentObserver = new MutationObserver(() => { updateDraftEstimate(box); });
-            attachmentObserver.observe(attachmentParent, { childList: true, subtree: true });
-        }
-    }
-
-    function startComposeBoxDiscovery(): void {
-        // Check if compose box already exists (fast path for initial load).
-        const existing = findComposeBox();
-        if (existing) {
-            attachComposeListener(existing);
+    function discoverComposeBox(): void {
+        const box = document.querySelector<HTMLElement>('div.ProseMirror[contenteditable="true"]')
+            ?? document.querySelector<HTMLElement>('div[contenteditable="true"][data-placeholder]');
+        if (box) {
+            composeBoxRef = box;
+            box.addEventListener('input', onComposeInput);
+            const parent = findFormParent(box);
+            if (parent) {
+                attachmentObserver = new MutationObserver(onComposeInput);
+                attachmentObserver.observe(parent, { childList: true, subtree: true });
+            }
+            composeObserver?.disconnect();
+            composeObserver = null;
             return;
         }
-
-        // Watch for the compose box to appear (SPA loads content dynamically).
-        composeObserver = new MutationObserver(() => {
-            const box = findComposeBox();
-            if (box) {
-                composeObserver?.disconnect();
-                composeObserver = null;
-                attachComposeListener(box);
-            }
-        });
-        composeObserver.observe(document.body, { childList: true, subtree: true });
-    }
-
-    function stopComposeBoxDiscovery(): void {
-        if (composeObserver) {
-            composeObserver.disconnect();
-            composeObserver = null;
-        }
-        composeBoxRef = null;
-        if (draftDebounceTimer) {
-            clearTimeout(draftDebounceTimer);
-            draftDebounceTimer = null;
+        if (!composeObserver) {
+            composeObserver = new MutationObserver(discoverComposeBox);
+            composeObserver.observe(document.body, { childList: true, subtree: true });
         }
     }
 
-    // Start discovering the compose box once the DOM is ready.
-    startComposeBoxDiscovery();
+    discoverComposeBox();
 
     // Reset overlay, conversation state, and dismissed nudges on SPA navigation (Chrome 102+).
     // Also finalize the previous conversation and detect the new one.
@@ -810,8 +747,11 @@ async function initializeMonitoring(): Promise<void> {
             overlay.hideNudge();
 
             // Re-discover the compose box: SPA navigation replaces the DOM.
-            stopComposeBoxDiscovery();
-            startComposeBoxDiscovery();
+            if (composeObserver) { composeObserver.disconnect(); composeObserver = null; }
+            if (attachmentObserver) { attachmentObserver.disconnect(); attachmentObserver = null; }
+            composeBoxRef = null;
+            if (draftDebounceTimer) { clearTimeout(draftDebounceTimer); draftDebounceTimer = null; }
+            discoverComposeBox();
 
             // Restore state from storage for the new conversation (if previously tracked).
             // The generation guard prevents this callback from overwriting state if the
