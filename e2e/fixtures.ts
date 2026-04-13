@@ -9,7 +9,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const EXTENSION_PATH = path.resolve(__dirname, '../.output/chrome-mv3');
-const MOCK_PORT = 3456;
+export const MOCK_PORT = 3456;
 
 export const test = base.extend<{
     context: BrowserContext;
@@ -62,11 +62,13 @@ export const test = base.extend<{
     },
 
     extensionId: async ({ context }, use) => {
+        // serviceWorkers() is synchronous. If the context fixture ran first (it always
+        // does, since extensionId depends on context), the worker is already registered.
+        // The fallback waitForEvent handles the rare case where the list is still empty.
         const sw = context.serviceWorkers();
-        let id = '';
-        if (sw.length > 0) {
-            id = sw[0].url().split('/')[2];
-        }
+        const id = sw.length > 0
+            ? sw[0].url().split('/')[2]
+            : (await context.waitForEvent('serviceworker')).url().split('/')[2];
         await use(id);
     },
 
@@ -77,6 +79,10 @@ export const test = base.extend<{
         await page.goto(`https://claude.ai:${MOCK_PORT}/chat/test-conversation`, {
             waitUntil: 'domcontentloaded',
         });
+        // Wait for the content script to finish its async init and attach the shadow host.
+        // state: 'attached' checks DOM presence only — the host has zero dimensions until
+        // the first stream fires, so the default visibility check would timeout here.
+        await page.waitForSelector('#lco-widget-host', { state: 'attached', timeout: 10000 });
         await use(page);
     },
 });

@@ -18,26 +18,24 @@ test.describe('Extension Loading', () => {
     });
 
     test('content script injects on claude.ai page', async ({ mockPage }) => {
-        // The content script creates #lco-widget-host on the page
-        // Give it time to inject (document_start + async init)
-        await mockPage.waitForTimeout(2000);
-
+        // mockPage fixture already awaited waitForSelector('#lco-widget-host', { state: 'attached' }).
+        // Reaching this line means the element is in the DOM; assert it directly.
         const host = await mockPage.$('#lco-widget-host');
         expect(host).not.toBeNull();
     });
 
     test('inject.ts runs and logs initialization', async ({ mockPage }) => {
-        // Listen for console messages from inject.ts
         const messages: string[] = [];
         mockPage.on('console', (msg) => {
-            if (msg.text().includes('[LCO]')) {
-                messages.push(msg.text());
-            }
+            if (msg.text().includes('[LCO]')) messages.push(msg.text());
         });
 
-        // Reload to capture all console messages from page load
+        // Subscribe before reload so no events are missed.
+        const initPromise = mockPage.waitForEvent('console', (msg) =>
+            msg.text().includes('Fetch interceptor initialized'),
+        );
         await mockPage.reload({ waitUntil: 'domcontentloaded' });
-        await mockPage.waitForTimeout(3000);
+        await initPromise;
 
         const initMsg = messages.find(m => m.includes('Fetch interceptor initialized'));
         expect(initMsg).toBeDefined();

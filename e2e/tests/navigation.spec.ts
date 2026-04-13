@@ -1,9 +1,7 @@
 // e2e/tests/navigation.spec.ts
 // Verifies overlay state behavior across navigation events.
 
-import { test, expect } from '../fixtures';
-
-const MOCK_PORT = 3456;
+import { test, expect, MOCK_PORT } from '../fixtures';
 
 test.describe('Navigation', () => {
     test('hard navigation preserves extension injection', async ({ context }) => {

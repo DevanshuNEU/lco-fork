@@ -1,14 +1,9 @@
 // e2e/tests/service-worker-lifecycle.spec.ts
-// Verifies the extension recovers after the service worker stops and restarts.
+// Verifies service worker persistence and stream reliability across multiple requests.
 
 import { test, expect } from '../fixtures';
 
 test.describe('Service Worker Lifecycle', () => {
-    test('service worker is active after extension load', async ({ context }) => {
-        const sw = context.serviceWorkers();
-        expect(sw.length).toBeGreaterThan(0);
-    });
-
     test('second stream completes after first: worker stays alive between requests', async ({ context, mockPage }) => {
         // Playwright has no API to force-stop an extension service worker.
         // What this test validates: the worker is still active and functional
@@ -20,11 +15,8 @@ test.describe('Service Worker Lifecycle', () => {
             if (msg.text().includes('[Complete]')) firstRun.push(msg.text());
         });
 
-        await mockPage.waitForTimeout(2000);
         await mockPage.click('#trigger-stream');
-        await mockPage.waitForTimeout(4000);
-
-        expect(firstRun.length).toBeGreaterThan(0);
+        await expect.poll(() => firstRun.length, { timeout: 8000 }).toBeGreaterThan(0);
 
         // Confirm worker is still registered after the first stream.
         const sw = context.serviceWorkers();
@@ -38,9 +30,7 @@ test.describe('Service Worker Lifecycle', () => {
         });
 
         await mockPage.click('#trigger-stream');
-        await mockPage.waitForTimeout(4000);
-
-        expect(secondRun.length).toBeGreaterThan(0);
+        await expect.poll(() => secondRun.length, { timeout: 8000 }).toBeGreaterThan(0);
     });
 
     test('multiple sequential streams work without worker issues', async ({ mockPage }) => {
@@ -49,15 +39,12 @@ test.describe('Service Worker Lifecycle', () => {
             if (msg.text().includes('[Complete]')) completions.push(msg.text());
         });
 
-        await mockPage.waitForTimeout(2000);
-
-        // Fire three streams in sequence
         for (let i = 0; i < 3; i++) {
+            const countBefore = completions.length;
             await mockPage.click('#trigger-stream');
-            await mockPage.waitForTimeout(4000);
+            await expect.poll(() => completions.length, { timeout: 8000 }).toBeGreaterThan(countBefore);
         }
 
-        // All three should have completed
         expect(completions.length).toBe(3);
     });
 });
