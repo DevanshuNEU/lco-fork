@@ -5,9 +5,10 @@
 import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const PORT = 3456;
-const CERT_DIR = path.resolve(import.meta.dir, 'certs');
+const CERT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'certs');
 
 const cert = fs.readFileSync(path.join(CERT_DIR, 'cert.pem'));
 const key = fs.readFileSync(path.join(CERT_DIR, 'key.pem'));
