@@ -82,9 +82,11 @@ jobs:
             exit 1
           fi
 
-          # Content script and injected script must stay lean.
-          if [ "$CONTENT" -gt 51200 ]; then
-            echo "ERROR: claude-ai.js exceeds 50 KB limit (${CONTENT} bytes)"
+          # Content script: grew from ~47 KB to ~53 KB across Phase 3
+          # (delta tracking, coaching engine, pre-submit intelligence).
+          # Bumped from 50 KB to 60 KB to accommodate the new agents.
+          if [ "$CONTENT" -gt 61440 ]; then
+            echo "ERROR: claude-ai.js exceeds 60 KB limit (${CONTENT} bytes)"
             exit 1
           fi
 

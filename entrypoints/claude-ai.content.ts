@@ -5,7 +5,8 @@
 import type { LcoBridgeMessage, StoreTokenBatchMessage, StoreMessageLimitMessage, StoreTokenBatchResponse, RecordTurnMessage, FinalizeConversationMessage, SetActiveConvMessage, StoreUsageLimitsMessage } from '../lib/message-types';
 import { LCO_NAMESPACE } from '../lib/message-types';
 import { isValidBridgeSchema } from '../lib/bridge-validation';
-import { INITIAL_STATE, applyTokenBatch, applyStreamComplete, applyStorageResponse, applyHealthBroken, applyHealthRecovered, applyMessageLimit, applyRestoredConversation } from '../lib/overlay-state';
+import { INITIAL_STATE, applyTokenBatch, applyStreamComplete, applyStorageResponse, applyHealthBroken, applyHealthRecovered, applyMessageLimit, applyRestoredConversation, applyDraftEstimate, clearDraftEstimate } from '../lib/overlay-state';
+import { computePreSubmitEstimate } from '../lib/pre-submit';
 import { createOverlay } from '../ui/overlay';
 import { showEnableBanner } from '../ui/enable-banner';
 import { ClaudeAdapter } from '../lib/adapters/claude';
@@ -166,6 +167,16 @@ async function initializeMonitoring(): Promise<void> {
     // Cross-conversation: not reset on SPA navigation, only on org change.
     let cachedTokenEconomics: Record<string, number> | null = null;
 
+    // Cached medianPctPerInputToken: session % per input token, per model.
+    // Used by the Pre-Submit Agent to predict draft cost from char count.
+    let cachedPctPerInputToken: Record<string, number> | null = null;
+
+    // Compose box observer for pre-submit cost estimation.
+    let composeBoxRef: HTMLElement | null = null;
+    let composeObserver: MutationObserver | null = null;
+    let attachmentObserver: MutationObserver | null = null;
+    let draftDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
     // Restore state from stored conversation record if one exists.
     // This gives the overlay correct context % and turn count immediately
     // on page load, instead of showing 0% until the user sends a message.
@@ -243,7 +254,10 @@ async function initializeMonitoring(): Promise<void> {
             currentOrgId = msg.organizationId;
 
             // Clear stale token economics when org changes (different account).
-            if (orgChanged) cachedTokenEconomics = null;
+            if (orgChanged) {
+                cachedTokenEconomics = null;
+                cachedPctPerInputToken = null;
+            }
 
             if (wasNull || orgChanged) {
                 // Re-send SET_ACTIVE_CONV with the now-known org ID so the
@@ -274,9 +288,12 @@ async function initializeMonitoring(): Promise<void> {
                 browser.runtime.sendMessage({
                     type: 'GET_TOKEN_ECONOMICS',
                     organizationId: currentOrgId,
-                }).then((result: { medianTokensPer1Pct: Record<string, number> } | null) => {
-                    if (result) cachedTokenEconomics = result.medianTokensPer1Pct;
-                }).catch(() => { /* non-critical; delta coaching degrades gracefully */ });
+                }).then((result: { medianTokensPer1Pct: Record<string, number>; medianPctPerInputToken: Record<string, number> } | null) => {
+                    if (result) {
+                        cachedTokenEconomics = result.medianTokensPer1Pct;
+                        cachedPctPerInputToken = result.medianPctPerInputToken;
+                    }
+                }).catch(() => { /* non-critical; coaching and pre-submit degrade gracefully */ });
             }
             return; // ORGANIZATION_DETECTED is handled; no further processing.
         }
@@ -295,7 +312,22 @@ async function initializeMonitoring(): Promise<void> {
             }
         }
 
+        // Pre-send fallback: inject.ts posts DRAFT_ESTIMATE right before the fetch.
+        // This guarantees a cost estimate even if the compose box observer is disconnected.
+        if (msg.type === 'DRAFT_ESTIMATE') {
+            const estimate = computePreSubmitEstimate({
+                draftCharCount: msg.draftCharCount,
+                model: convState.model || 'claude-sonnet-4-6',
+                pctPerInputToken: cachedPctPerInputToken,
+                currentSessionPct: lastKnownUtilization ?? 0,
+            });
+            state = applyDraftEstimate(state, estimate);
+            overlay.render(state);
+        }
+
         if (msg.type === 'TOKEN_BATCH') {
+            // Clear draft estimate: the message has been sent, stream is starting.
+            state = clearDraftEstimate(state);
             browser.runtime.sendMessage({
                 type: 'STORE_TOKEN_BATCH',
                 platform: msg.platform,
@@ -612,6 +644,68 @@ async function initializeMonitoring(): Promise<void> {
         }
     });
 
+    // Compose box observer: finds ProseMirror editor, reads text + attachment
+    // card content from the parent form/fieldset, debounces pre-submit estimates.
+
+    function findFormParent(el: HTMLElement): HTMLElement | null {
+        let p: HTMLElement | null = el.parentElement;
+        for (let i = 0; i < 5 && p; i++) {
+            const t = p.tagName;
+            if (t === 'FIELDSET' || t === 'FORM') return p;
+            p = p.parentElement;
+        }
+        return null;
+    }
+
+    function onComposeInput(): void {
+        if (!composeBoxRef) return;
+        const container = findFormParent(composeBoxRef);
+        const text = (container ?? composeBoxRef).textContent ?? '';
+
+        if (text.length < 20) {
+            if (draftDebounceTimer) { clearTimeout(draftDebounceTimer); draftDebounceTimer = null; }
+            if (state.draftEstimate !== null) {
+                state = clearDraftEstimate(state);
+                overlay.render(state);
+            }
+            return;
+        }
+
+        if (draftDebounceTimer) clearTimeout(draftDebounceTimer);
+        draftDebounceTimer = setTimeout(() => {
+            state = applyDraftEstimate(state, computePreSubmitEstimate({
+                draftCharCount: text.length,
+                model: convState.model || 'claude-sonnet-4-6',
+                pctPerInputToken: cachedPctPerInputToken,
+                currentSessionPct: lastKnownUtilization ?? 0,
+            }));
+            overlay.render(state);
+        }, 500);
+    }
+
+    function discoverComposeBox(): void {
+        const box = document.querySelector<HTMLElement>('div.ProseMirror[contenteditable="true"]')
+            ?? document.querySelector<HTMLElement>('div[contenteditable="true"][data-placeholder]');
+        if (box) {
+            composeBoxRef = box;
+            box.addEventListener('input', onComposeInput);
+            const parent = findFormParent(box);
+            if (parent) {
+                attachmentObserver = new MutationObserver(onComposeInput);
+                attachmentObserver.observe(parent, { childList: true, subtree: true });
+            }
+            composeObserver?.disconnect();
+            composeObserver = null;
+            return;
+        }
+        if (!composeObserver) {
+            composeObserver = new MutationObserver(discoverComposeBox);
+            composeObserver.observe(document.body, { childList: true, subtree: true });
+        }
+    }
+
+    discoverComposeBox();
+
     // Reset overlay, conversation state, and dismissed nudges on SPA navigation (Chrome 102+).
     // Also finalize the previous conversation and detect the new one.
     if ('navigation' in window) {
@@ -651,6 +745,13 @@ async function initializeMonitoring(): Promise<void> {
             const thisGeneration = ++navGeneration;
             overlay.render(state);
             overlay.hideNudge();
+
+            // Re-discover the compose box: SPA navigation replaces the DOM.
+            if (composeObserver) { composeObserver.disconnect(); composeObserver = null; }
+            if (attachmentObserver) { attachmentObserver.disconnect(); attachmentObserver = null; }
+            composeBoxRef = null;
+            if (draftDebounceTimer) { clearTimeout(draftDebounceTimer); draftDebounceTimer = null; }
+            discoverComposeBox();
 
             // Restore state from storage for the new conversation (if previously tracked).
             // The generation guard prevents this callback from overwriting state if the
