@@ -50,11 +50,13 @@ describe('lookupModel', () => {
         expect(p.outputCostPerToken * 1_000_000).toBeCloseTo(5, 5);
     });
 
-    test('all known models have 200k context window', () => {
-        const models = ['claude-opus-4-6', 'claude-sonnet-4-6', 'claude-haiku-4-5'];
-        for (const m of models) {
-            expect(lookupModel(m)!.contextWindow).toBe(200_000);
-        }
+    test('Opus 4.6 and Sonnet 4.6 have 1M context windows', () => {
+        expect(lookupModel('claude-opus-4-6')!.contextWindow).toBe(1_000_000);
+        expect(lookupModel('claude-sonnet-4-6')!.contextWindow).toBe(1_000_000);
+    });
+
+    test('Haiku 4.5 has a 200K context window', () => {
+        expect(lookupModel('claude-haiku-4-5')!.contextWindow).toBe(200_000);
     });
 });
 
@@ -139,9 +141,12 @@ describe('calculateCost', () => {
 // ── getContextWindowSize ────────────────────────────────────────────────────
 
 describe('getContextWindowSize', () => {
-    test('returns 200000 for all known models', () => {
-        expect(getContextWindowSize('claude-opus-4-6')).toBe(200_000);
-        expect(getContextWindowSize('claude-sonnet-4-6')).toBe(200_000);
+    test('returns 1M for Opus 4.6 and Sonnet 4.6', () => {
+        expect(getContextWindowSize('claude-opus-4-6')).toBe(1_000_000);
+        expect(getContextWindowSize('claude-sonnet-4-6')).toBe(1_000_000);
+    });
+
+    test('returns 200K for Haiku 4.5', () => {
         expect(getContextWindowSize('claude-haiku-4-5')).toBe(200_000);
     });
 

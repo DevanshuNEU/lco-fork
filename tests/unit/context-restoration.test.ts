@@ -71,11 +71,11 @@ function makeRecord(overrides: Partial<ConversationRecord> = {}): ConversationRe
         totalOutputTokens: 1100,
         peakContextPct: 2.05,
         lastContextPct: 0.01, // near-zero from pre-cumulative tracking
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5',
         estimatedCost: 0.025,
         turns: [
-            { turnNumber: 1, inputTokens: 200, outputTokens: 80, model: 'claude-sonnet-4-6', contextPct: 0.001, cost: 0.002, completedAt: Date.now() - 60000 },
-            { turnNumber: 2, inputTokens: 200, outputTokens: 70, model: 'claude-sonnet-4-6', contextPct: 0.001, cost: 0.002, completedAt: Date.now() - 30000 },
+            { turnNumber: 1, inputTokens: 200, outputTokens: 80, model: 'claude-haiku-4-5', contextPct: 0.001, cost: 0.002, completedAt: Date.now() - 60000 },
+            { turnNumber: 2, inputTokens: 200, outputTokens: 70, model: 'claude-haiku-4-5', contextPct: 0.001, cost: 0.002, completedAt: Date.now() - 30000 },
         ],
         dna: { ...EMPTY_DNA },
         _v: 1,
@@ -92,7 +92,7 @@ describe('buildConvStateFromRecord', () => {
 
         expect(result.turnCount).toBe(15);
         expect(result.contextPct).toBe(2.05);
-        expect(result.model).toBe('claude-sonnet-4-6');
+        expect(result.model).toBe('claude-haiku-4-5');
     });
 
     it('backfills contextHistory with the passed contextPct value', () => {
@@ -140,26 +140,26 @@ describe('buildConvStateFromRecord', () => {
 describe('cumulative contextPct computation', () => {
     it('computes percentage from cumulative tokens and context window', () => {
         // 3000 + 1100 = 4100 tokens / 200000 window * 100 = 2.05%
-        const pct = computeCumulativeContextPct(3000, 1100, 'claude-sonnet-4-6');
+        const pct = computeCumulativeContextPct(3000, 1100, 'claude-haiku-4-5');
         expect(pct).toBeCloseTo(2.05, 2);
     });
 
     it('grows with each additional turn', () => {
-        const turn1 = computeCumulativeContextPct(200, 100, 'claude-sonnet-4-6');
-        const turn2 = computeCumulativeContextPct(400, 200, 'claude-sonnet-4-6');
-        const turn3 = computeCumulativeContextPct(600, 300, 'claude-sonnet-4-6');
+        const turn1 = computeCumulativeContextPct(200, 100, 'claude-haiku-4-5');
+        const turn2 = computeCumulativeContextPct(400, 200, 'claude-haiku-4-5');
+        const turn3 = computeCumulativeContextPct(600, 300, 'claude-haiku-4-5');
 
         expect(turn2).toBeGreaterThan(turn1);
         expect(turn3).toBeGreaterThan(turn2);
     });
 
     it('returns 0 for zero tokens', () => {
-        expect(computeCumulativeContextPct(0, 0, 'claude-sonnet-4-6')).toBe(0);
+        expect(computeCumulativeContextPct(0, 0, 'claude-haiku-4-5')).toBe(0);
     });
 
     it('handles very large token counts without overflow', () => {
         // 180000 input + 19000 output = 199000 / 200000 = 99.5%
-        const pct = computeCumulativeContextPct(180000, 19000, 'claude-sonnet-4-6');
+        const pct = computeCumulativeContextPct(180000, 19000, 'claude-haiku-4-5');
         expect(pct).toBeCloseTo(99.5, 1);
     });
 

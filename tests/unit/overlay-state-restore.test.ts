@@ -18,7 +18,7 @@ function makeRecord(overrides: Partial<ConversationRecord> = {}): ConversationRe
         totalOutputTokens: 8000,
         peakContextPct: 42,
         lastContextPct: 38,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5',
         estimatedCost: 0.076,
         turns: [],
         dna: { ...EMPTY_DNA },
@@ -36,7 +36,7 @@ const healthyScore: HealthScore = {
 
 describe('applyRestoredConversation', () => {
     it('computes contextPct from cumulative tokens, not lastContextPct', () => {
-        // record has 12000 input + 8000 output = 20000 tokens, model = claude-sonnet-4-6 (200k window)
+        // record has 12000 input + 8000 output = 20000 tokens, model = claude-haiku-4-5 (200k window)
         // 20000 / 200000 * 100 = 10%
         const result = applyRestoredConversation(INITIAL_STATE, makeRecord(), healthyScore);
         expect(result.contextPct).toBeCloseTo(10, 1);
@@ -61,7 +61,7 @@ describe('applyRestoredConversation', () => {
             lastRequest: {
                 inputTokens: 500,
                 outputTokens: 200,
-                model: 'claude-sonnet-4-6',
+                model: 'claude-haiku-4-5',
                 cost: 0.004,
             },
         };

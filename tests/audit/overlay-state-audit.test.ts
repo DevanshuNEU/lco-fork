@@ -118,7 +118,7 @@ describe('applyRestoredConversation', () => {
         totalOutputTokens: 20000,
         peakContextPct: 35,
         lastContextPct: 35,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5',
         estimatedCost: 0.25,
         turns: [],
         dna: { subject: '', lastContext: '', hints: [] },
