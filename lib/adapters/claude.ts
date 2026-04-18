@@ -27,6 +27,9 @@ export const ClaudeAdapter: ProviderAdapter = {
             contentDeltaType: 'delta.type',
             contentDeltaTypeValue: 'text_delta',
             contentDeltaText: 'delta.text',
+            // message_start event shape: { type: 'message_start', message: { usage: { input_tokens: N } } }
+            // N = full context: system prompt + conversation history + current user message.
+            contextInputTokens: 'message.usage.input_tokens',
         },
         body: {
             model: 'model',

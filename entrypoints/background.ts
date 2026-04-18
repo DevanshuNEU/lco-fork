@@ -358,17 +358,28 @@ export default defineBackground({
         if (tabId !== undefined) {
           const convKey = `activeConv_${tabId}`;
           const orgKey = `activeOrg_${tabId}`;
+          const setData: Record<string, string> = {};
+          const removeKeys: string[] = [];
+
           if (message.conversationId) {
-            const setData: Record<string, string> = { [convKey]: message.conversationId };
-            if (message.organizationId) {
-              setData[orgKey] = message.organizationId;
-            } else {
-              // organizationId not provided: remove any stale key from a prior scope.
-              browser.storage.session.remove([orgKey]).catch(() => {});
-            }
-            browser.storage.session.set(setData).catch(() => {});
+            setData[convKey] = message.conversationId;
           } else {
-            browser.storage.session.remove([convKey, orgKey]).catch(() => {});
+            removeKeys.push(convKey);
+          }
+
+          if (message.organizationId) {
+            setData[orgKey] = message.organizationId;
+          } else {
+            // organizationId not provided: clear any stale org key so the
+            // side panel does not query the wrong account scope.
+            removeKeys.push(orgKey);
+          }
+
+          if (Object.keys(setData).length > 0) {
+            browser.storage.session.set(setData).catch(() => {});
+          }
+          if (removeKeys.length > 0) {
+            browser.storage.session.remove(removeKeys).catch(() => {});
           }
         }
         sendResponse({ ok: true });
