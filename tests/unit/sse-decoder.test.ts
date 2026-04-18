@@ -25,6 +25,8 @@ interface InjectConfig {
     contentDeltaType: string;
     contentDeltaTypeValue: string;
     contentDeltaText: string;
+    // mirrors contextInputTokens in lib/adapters/types.ts
+    contextInputTokens?: string;
   };
   body: {
     model: string;
@@ -77,7 +79,7 @@ function handleProviderEvent(
   evt: any,
   config: InjectConfig,
   health: HealthState,
-  summary: { inputTokens: number; outputTokens: number; model: string },
+  summary: { inputTokens: number; outputTokens: number; model: string; hasRealInputTokens: boolean },
   promptText: string,
 ): { messageLimitUtilization?: number } {
   const { events, paths } = config;
@@ -86,8 +88,15 @@ function handleProviderEvent(
 
   if (type === events.streamStart) {
     health.sawMessageStart = true;
-    if (promptText) {
-      summary.inputTokens = Math.round(promptText.length / 4);
+    const realInputTokens = paths.contextInputTokens
+      ? getPath(evt, paths.contextInputTokens)
+      : undefined;
+
+    if (typeof realInputTokens === 'number' && realInputTokens > 0) {
+      summary.inputTokens = realInputTokens;
+      summary.hasRealInputTokens = true;
+    } else {
+      summary.inputTokens = promptText ? Math.round(promptText.length / 4) : 0;
     }
   }
 
@@ -174,7 +183,7 @@ function makeHealth(): HealthState {
   return { chunksProcessed: 0, sawMessageStart: false, sawContentBlock: false, stopReason: null };
 }
 function makeSummary(model = 'claude-sonnet-4-6') {
-  return { inputTokens: 0, outputTokens: 0, model };
+  return { inputTokens: 0, outputTokens: 0, model, hasRealInputTokens: false };
 }
 
 // ---
@@ -254,19 +263,60 @@ describe('handleProviderEvent — state mutations', () => {
     expect(health.sawMessageStart).toBe(true);
   });
 
-  it('computes chars/4 input estimate from promptText on stream_start', () => {
+  it('uses exact input_tokens from SSE message_start when available', () => {
+    const health = makeHealth();
+    const summary = makeSummary();
+    // message_start carries the full context: history + system prompt + current message
+    const evt = { type: 'message_start', message: { usage: { input_tokens: 12500 } } };
+    handleProviderEvent(evt, config, health, summary, 'a'.repeat(400));
+    expect(summary.inputTokens).toBe(12500);
+    expect(summary.hasRealInputTokens).toBe(true);
+  });
+
+  it('falls back to chars/4 when contextInputTokens path is absent from event', () => {
     const health = makeHealth();
     const summary = makeSummary();
     const prompt = 'a'.repeat(400); // 400 chars → 100 tokens
     handleProviderEvent({ type: 'message_start' }, config, health, summary, prompt);
     expect(summary.inputTokens).toBe(100);
+    expect(summary.hasRealInputTokens).toBe(false);
   });
 
-  it('does not update inputTokens when promptText is empty', () => {
+  it('falls back to chars/4 when SSE input_tokens is zero', () => {
+    const health = makeHealth();
+    const summary = makeSummary();
+    const evt = { type: 'message_start', message: { usage: { input_tokens: 0 } } };
+    const prompt = 'a'.repeat(400);
+    handleProviderEvent(evt, config, health, summary, prompt);
+    expect(summary.inputTokens).toBe(100);
+    expect(summary.hasRealInputTokens).toBe(false);
+  });
+
+  it('falls back to chars/4 when SSE input_tokens is not a number', () => {
+    const health = makeHealth();
+    const summary = makeSummary();
+    const evt = { type: 'message_start', message: { usage: { input_tokens: 'many' } } };
+    const prompt = 'a'.repeat(400);
+    handleProviderEvent(evt, config, health, summary, prompt);
+    expect(summary.inputTokens).toBe(100);
+    expect(summary.hasRealInputTokens).toBe(false);
+  });
+
+  it('does not update inputTokens when promptText is empty and SSE field absent', () => {
     const health = makeHealth();
     const summary = makeSummary();
     handleProviderEvent({ type: 'message_start' }, config, health, summary, '');
     expect(summary.inputTokens).toBe(0);
+  });
+
+  it('SSE value takes precedence over promptText even when prompt is longer', () => {
+    const health = makeHealth();
+    const summary = makeSummary();
+    // SSE says 5000 tokens; prompt alone would estimate 250
+    const evt = { type: 'message_start', message: { usage: { input_tokens: 5000 } } };
+    handleProviderEvent(evt, config, health, summary, 'a'.repeat(1000));
+    expect(summary.inputTokens).toBe(5000);
+    expect(summary.hasRealInputTokens).toBe(true);
   });
 
   it('sets sawContentBlock on content_block_start event', () => {
@@ -498,5 +548,11 @@ describe('getPath dot-path accessor', () => {
   it('resolves the stop_reason path used by ClaudeAdapter', () => {
     const evt = { delta: { stop_reason: 'max_tokens' } };
     expect(getPath(evt, config.paths.stopReason)).toBe('max_tokens');
+  });
+
+  it('resolves the contextInputTokens path used by ClaudeAdapter', () => {
+    // Confirms the dot-path points to the right field in Claude's message_start event.
+    const evt = { message: { usage: { input_tokens: 8432 } } };
+    expect(getPath(evt, config.paths.contextInputTokens!)).toBe(8432);
   });
 });

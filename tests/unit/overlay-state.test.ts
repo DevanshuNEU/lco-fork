@@ -72,7 +72,7 @@ describe('applyTokenBatch', () => {
         expect(next.healthBroken).toBeNull();
     });
 
-    it('preserves contextPct from prior state (cumulative tracking lives in content script)', () => {
+    it('preserves contextPct from prior state (per-turn context fill managed by content script)', () => {
         const withContext: OverlayState = { ...INITIAL_STATE, contextPct: 12.5 };
         const next = applyTokenBatch(withContext, TOKEN_PAYLOAD);
         expect(next.contextPct).toBe(12.5);
