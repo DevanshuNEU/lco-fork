@@ -36,6 +36,16 @@ export interface InjectConfig {
         contentDeltaType: string;
         contentDeltaTypeValue: string;
         contentDeltaText: string;
+        /**
+         * Path to the exact input token count in the stream-start event.
+         * When present, this value reflects the full context sent to the model:
+         * system prompt + entire conversation history + current user message.
+         * Providers that do not expose this field omit the key; inject.ts falls
+         * back to the chars/4 estimate when the key is absent or the value is
+         * not a positive number.
+         * Claude: 'message.usage.input_tokens' (in the message_start event)
+         */
+        contextInputTokens?: string;
     };
 
     /** Field names to read from the request body JSON. */
