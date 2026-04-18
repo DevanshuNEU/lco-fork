@@ -53,7 +53,7 @@ describe('lookupModel', () => {
 
 // ── Context window sizes ──────────────────────────────────────────────────────
 
-describe('getContextWindowSize — 1M models', () => {
+describe('getContextWindowSize: 1M models', () => {
     // Opus 4.7, Sonnet 4.6, and Opus 4.6 all ship with 1M context windows.
     // This is the critical correctness check: the old value was 200K, which
     // made contextPct show ~5x too high for every active user on these models.
@@ -78,7 +78,7 @@ describe('getContextWindowSize — 1M models', () => {
     });
 });
 
-describe('getContextWindowSize — 200K models', () => {
+describe('getContextWindowSize: 200K models', () => {
     it('claude-haiku-4-5', () => {
         expect(getContextWindowSize('claude-haiku-4-5')).toBe(200_000);
     });
@@ -197,7 +197,11 @@ describe('calculateCost', () => {
         expect(alias).toBe(versioned);
     });
 
-    it('returns null for negative token counts', () => {
+    it('returns null for negative input token count', () => {
         expect(calculateCost(-1, 0, 'claude-opus-4-7')).toBeNull();
+    });
+
+    it('returns null for negative output token count', () => {
+        expect(calculateCost(0, -1, 'claude-opus-4-7')).toBeNull();
     });
 });
