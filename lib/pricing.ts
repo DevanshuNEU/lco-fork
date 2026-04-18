@@ -45,3 +45,15 @@ export function calculateCost(
 export function getContextWindowSize(model: string): number {
     return lookupModel(model)?.contextWindow ?? DEFAULT_CONTEXT_WINDOW;
 }
+
+/**
+ * Returns true if the model exists in the pricing table.
+ *
+ * Use this to distinguish a known zero-cost result from an unknown model.
+ * Unknown models still get a 200K context window fallback and show $0.00*
+ * in the overlay. Callers that need to signal uncertainty (e.g. the
+ * contextPct display) can gate on this flag instead of guessing.
+ */
+export function isKnownModel(model: string): boolean {
+    return lookupModel(model) !== null;
+}

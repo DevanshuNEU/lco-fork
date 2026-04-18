@@ -202,8 +202,8 @@ describe('pipeline: short response', () => {
     });
 
     it('contextPct is computed from total tokens', () => {
-        // (50 + 150) / 200000 * 100 = 0.1%
-        expect(result.contextPct).toBeCloseTo(0.1, 4);
+        // (50 + 150) / 1000000 * 100 = 0.02% (claude-sonnet-4-6 has a 1M context window)
+        expect(result.contextPct).toBeCloseTo(0.02, 4);
     });
 });
 
@@ -226,8 +226,8 @@ describe('pipeline: long response', () => {
     });
 
     it('contextPct reflects large token usage', () => {
-        // (2000 + 8000) / 200000 * 100 = 5%
-        expect(result.contextPct).toBeCloseTo(5.0, 4);
+        // (2000 + 8000) / 1000000 * 100 = 1% (claude-opus-4-6 has a 1M context window)
+        expect(result.contextPct).toBeCloseTo(1.0, 4);
     });
 });
 

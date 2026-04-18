@@ -114,13 +114,13 @@ function makeRecord(overrides: Partial<ConversationRecord> = {}): ConversationRe
         totalOutputTokens: 1100,
         peakContextPct: 2.05,
         lastContextPct: 0.01,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5',
         estimatedCost: 0.025,
         turns: Array.from({ length: 15 }, (_, i) => ({
             turnNumber: i + 1,
             inputTokens: 200,
             outputTokens: 73,
-            model: 'claude-sonnet-4-6',
+            model: 'claude-haiku-4-5',
             contextPct: 0.001,
             cost: 0.002,
             completedAt: Date.now() - (15 - i) * 60000,
@@ -211,7 +211,7 @@ describe('restore pipeline: restore then stream', () => {
         const restored = restoreConversation(record);
 
         // Simulate a new message: 50 input tokens, 200 output tokens
-        const msg = { inputTokens: 50, outputTokens: 200, model: 'claude-sonnet-4-6' };
+        const msg = { inputTokens: 50, outputTokens: 200, model: 'claude-haiku-4-5' };
         const after = applyStreamCompleteAfterRestore(restored, msg);
 
         expect(after.cumulativeInput).toBe(3050);
@@ -228,7 +228,7 @@ describe('restore pipeline: restore then stream', () => {
 
     it('turn count increments by one after each STREAM_COMPLETE', () => {
         const restored = restoreConversation(makeRecord());
-        const msg = { inputTokens: 10, outputTokens: 20, model: 'claude-sonnet-4-6' };
+        const msg = { inputTokens: 10, outputTokens: 20, model: 'claude-haiku-4-5' };
 
         const after1 = applyStreamCompleteAfterRestore(restored, msg);
         expect(after1.convState.turnCount).toBe(16);
@@ -239,7 +239,7 @@ describe('restore pipeline: restore then stream', () => {
 
     it('contextHistory grows with each STREAM_COMPLETE', () => {
         const restored = restoreConversation(makeRecord());
-        const msg = { inputTokens: 10, outputTokens: 20, model: 'claude-sonnet-4-6' };
+        const msg = { inputTokens: 10, outputTokens: 20, model: 'claude-haiku-4-5' };
 
         expect(restored.convState.contextHistory).toHaveLength(15);
 
@@ -252,7 +252,7 @@ describe('restore pipeline: restore then stream', () => {
 
     it('health score updates after STREAM_COMPLETE', () => {
         const restored = restoreConversation(makeRecord());
-        const msg = { inputTokens: 10, outputTokens: 20, model: 'claude-sonnet-4-6' };
+        const msg = { inputTokens: 10, outputTokens: 20, model: 'claude-haiku-4-5' };
 
         const after = applyStreamCompleteAfterRestore(restored, msg);
         expect(after.state.health).not.toBeNull();
@@ -261,12 +261,12 @@ describe('restore pipeline: restore then stream', () => {
 
     it('cost accumulates correctly across multiple turns', () => {
         const restored = restoreConversation(makeRecord());
-        const msg = { inputTokens: 100, outputTokens: 500, model: 'claude-sonnet-4-6' };
+        const msg = { inputTokens: 100, outputTokens: 500, model: 'claude-haiku-4-5' };
 
         const after1 = applyStreamCompleteAfterRestore(restored, msg);
         const after2 = applyStreamCompleteAfterRestore(after1, msg);
 
-        const msgCost = calculateCost(100, 500, 'claude-sonnet-4-6') ?? 0;
+        const msgCost = calculateCost(100, 500, 'claude-haiku-4-5') ?? 0;
         expect(after2.cumulativeCost).toBeCloseTo(0.025 + msgCost * 2, 6);
     });
 });
