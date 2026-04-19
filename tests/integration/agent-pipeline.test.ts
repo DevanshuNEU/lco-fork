@@ -125,9 +125,9 @@ describe('agent pipeline: healthy mid-conversation', () => {
         expect(stale).toBeUndefined();
     });
 
-    it('health agent returns degrading (12 turns, 55% context)', () => {
-        // contextPct(55) >= HEALTHY_CEIL(50) && turnCount(12) > TURN_HEALTHY_CEIL(10)
-        expect(health.level).toBe('degrading');
+    it('health agent returns healthy (12 turns, 55% context)', () => {
+        // contextPct(55) < HEALTHY_CEIL(70): below threshold, healthy by default
+        expect(health.level).toBe('healthy');
     });
 
     it('delta coach returns no critical signals at 62% session', () => {
@@ -143,6 +143,32 @@ describe('agent pipeline: healthy mid-conversation', () => {
             expect(typeof signal.message).toBe('string');
             expect(signal.message.length).toBeGreaterThan(0);
         }
+    });
+});
+
+// ── Agent pipeline: degrading state (new HEALTHY_CEIL=70 boundary) ──────────
+
+describe('agent pipeline: degrading mid-conversation', () => {
+    const convState = makeConvState({
+        contextPct: 75,
+        turnCount: 12,
+        contextHistory: [5, 10, 18, 25, 33, 42, 50, 55, 60, 65, 70, 75],
+    });
+
+    const health = computeHealthScore({
+        contextPct: convState.contextPct,
+        turnCount: convState.turnCount,
+        growthRate: computeGrowthRate(convState.contextHistory),
+    });
+
+    it('health agent returns degrading (12 turns, 75% context)', () => {
+        // contextPct(75) >= HEALTHY_CEIL(70) && turnCount(12) > TURN_HEALTHY_CEIL(10)
+        expect(health.level).toBe('degrading');
+    });
+
+    it('degrading coaching is non-empty', () => {
+        expect(health.coaching.length).toBeGreaterThan(0);
+        expect(health.label).toBe('Degrading');
     });
 });
 
@@ -175,7 +201,7 @@ describe('agent pipeline: critical conversation', () => {
     });
 
     it('health agent returns critical', () => {
-        // contextPct(85) >= DEGRADING_CEIL(80)
+        // contextPct(85) < DEGRADING_CEIL(90) but >= HEALTHY_CEIL(70) && turnCount(25) > TURN_DEGRADING_CEIL(20): Rule 2
         expect(health.level).toBe('critical');
     });
 

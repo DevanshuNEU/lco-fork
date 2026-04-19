@@ -41,7 +41,7 @@ describe('critical health', () => {
 
     it('includes turn count in coaching when critical from turns', () => {
         const h = computeHealthScore(input({
-            contextPct: 55,
+            contextPct: 75,
             turnCount: 25,
         }));
         expect(h.coaching).toMatch(/25 turns deep/);
@@ -95,21 +95,15 @@ describe('degrading health', () => {
     });
 
     it('uses singular "message" when only 1 message remaining', () => {
+        // contextPct=80, growthRate=15: (100-80)/15 = 1.33, rounds to 1 → "~1 message"
+        // Rule 4 fires: growthRate(15) > FAST_GROWTH_PCT(8) && contextPct(80) > 30
         const h = computeHealthScore(input({
-            contextPct: 90,
+            contextPct: 80,
             turnCount: 3,
-            growthRate: 12,
+            growthRate: 15,
         }));
-        // contextPct >= 80 triggers Critical (Rule 1), not this rule
-        // Use a case where contextPct is between 30-80
-        const h2 = computeHealthScore(input({
-            contextPct: 79,
-            turnCount: 3,
-            growthRate: 50, // (100-79)/50 = 0.42, rounds to 0
-        }));
-        if (h2.level === 'degrading') {
-            expect(h2.coaching).toMatch(/~0 messages/);
-        }
+        expect(h.level).toBe('degrading');
+        expect(h.coaching).toMatch(/~1 message until context limit/);
     });
 });
 
@@ -207,7 +201,7 @@ describe('rule priority', () => {
 
     it('turn+context critical overrides growth-rate degrading', () => {
         const h = computeHealthScore(input({
-            contextPct: 55,
+            contextPct: 75,
             turnCount: TURN_DEGRADING_CEIL + 1,
             growthRate: FAST_GROWTH_PCT + 5,
         }));
