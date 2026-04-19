@@ -146,6 +146,32 @@ describe('agent pipeline: healthy mid-conversation', () => {
     });
 });
 
+// ── Agent pipeline: degrading state (new HEALTHY_CEIL=70 boundary) ──────────
+
+describe('agent pipeline: degrading mid-conversation', () => {
+    const convState = makeConvState({
+        contextPct: 75,
+        turnCount: 12,
+        contextHistory: [5, 10, 18, 25, 33, 42, 50, 55, 60, 65, 70, 75],
+    });
+
+    const health = computeHealthScore({
+        contextPct: convState.contextPct,
+        turnCount: convState.turnCount,
+        growthRate: computeGrowthRate(convState.contextHistory),
+    });
+
+    it('health agent returns degrading (12 turns, 75% context)', () => {
+        // contextPct(75) >= HEALTHY_CEIL(70) && turnCount(12) > TURN_HEALTHY_CEIL(10)
+        expect(health.level).toBe('degrading');
+    });
+
+    it('degrading coaching is non-empty', () => {
+        expect(health.coaching.length).toBeGreaterThan(0);
+        expect(health.label).toBe('Degrading');
+    });
+});
+
 // ── Agent pipeline: critical state ──────────────────────────────────────────
 
 describe('agent pipeline: critical conversation', () => {
