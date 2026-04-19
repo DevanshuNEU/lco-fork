@@ -28,8 +28,8 @@ export interface HealthScore {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 // Context thresholds (percentage of context window).
-export const HEALTHY_CEIL = 50;
-export const DEGRADING_CEIL = 80;
+export const HEALTHY_CEIL = 70;
+export const DEGRADING_CEIL = 90;
 
 // Turn count thresholds. High turn count amplifies context rot.
 export const TURN_HEALTHY_CEIL = 10;
@@ -63,7 +63,7 @@ export function computeHealthScore(input: HealthInput): HealthScore {
         return {
             level: 'critical',
             label: 'Critical',
-            coaching: 'Context is nearly full. Start a new chat for better responses.',
+            coaching: 'Context nearly full. Start a new chat, or use Claude Projects for ongoing work.',
             contextPct,
         };
     }

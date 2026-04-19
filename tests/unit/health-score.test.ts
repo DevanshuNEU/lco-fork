@@ -41,7 +41,7 @@ describe('critical health', () => {
 
     it('includes turn count in coaching when critical from turns', () => {
         const h = computeHealthScore(input({
-            contextPct: 55,
+            contextPct: 75,
             turnCount: 25,
         }));
         expect(h.coaching).toMatch(/25 turns deep/);
@@ -100,8 +100,8 @@ describe('degrading health', () => {
             turnCount: 3,
             growthRate: 12,
         }));
-        // contextPct >= 80 triggers Critical (Rule 1), not this rule
-        // Use a case where contextPct is between 30-80
+        // contextPct >= 90 triggers Critical (Rule 1), not this rule
+        // Use a case where contextPct is between 30-90
         const h2 = computeHealthScore(input({
             contextPct: 79,
             turnCount: 3,
@@ -207,7 +207,7 @@ describe('rule priority', () => {
 
     it('turn+context critical overrides growth-rate degrading', () => {
         const h = computeHealthScore(input({
-            contextPct: 55,
+            contextPct: 75,
             turnCount: TURN_DEGRADING_CEIL + 1,
             growthRate: FAST_GROWTH_PCT + 5,
         }));

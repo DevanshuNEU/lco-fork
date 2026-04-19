@@ -17,8 +17,8 @@ import {
 // ── computeHealthScore: Rule 1 (context >= 80% = critical) ─────────────────
 
 describe('computeHealthScore: Rule 1 (high context = critical)', () => {
-    test('exactly at DEGRADING_CEIL (80%) is critical', () => {
-        expect(computeHealthScore({ contextPct: 80, turnCount: 0, growthRate: null }).level).toBe('critical');
+    test('exactly at DEGRADING_CEIL (90%) is critical', () => {
+        expect(computeHealthScore({ contextPct: 90, turnCount: 0, growthRate: null }).level).toBe('critical');
     });
 
     test('above DEGRADING_CEIL is critical', () => {
@@ -26,24 +26,24 @@ describe('computeHealthScore: Rule 1 (high context = critical)', () => {
     });
 
     test('just below DEGRADING_CEIL is not critical from context alone', () => {
-        expect(computeHealthScore({ contextPct: 79.9, turnCount: 0, growthRate: null }).level).not.toBe('critical');
+        expect(computeHealthScore({ contextPct: 89.9, turnCount: 0, growthRate: null }).level).not.toBe('critical');
     });
 });
 
 // ── Rule 2 (high context + many turns = critical) ──────────────────────────
 
-describe('computeHealthScore: Rule 2 (context >= 50 + turns > 20)', () => {
-    test('at threshold boundary: 50% context + 21 turns = critical', () => {
-        expect(computeHealthScore({ contextPct: 50, turnCount: 21, growthRate: null }).level).toBe('critical');
+describe('computeHealthScore: Rule 2 (context >= 70 + turns > 20)', () => {
+    test('at threshold boundary: 70% context + 21 turns = critical', () => {
+        expect(computeHealthScore({ contextPct: 70, turnCount: 21, growthRate: null }).level).toBe('critical');
     });
 
-    test('at threshold boundary: 50% context + 20 turns = degrading (not critical)', () => {
-        const result = computeHealthScore({ contextPct: 50, turnCount: 20, growthRate: null });
+    test('at threshold boundary: 70% context + 20 turns = degrading (not critical)', () => {
+        const result = computeHealthScore({ contextPct: 70, turnCount: 20, growthRate: null });
         expect(result.level).not.toBe('critical');
     });
 
-    test('below context threshold: 49% + 21 turns = not critical from rule 2', () => {
-        const result = computeHealthScore({ contextPct: 49, turnCount: 21, growthRate: null });
+    test('below context threshold: 69% + 21 turns = not critical from rule 2', () => {
+        const result = computeHealthScore({ contextPct: 69, turnCount: 21, growthRate: null });
         // Should be healthy or degrading from rule 5 (turns > 30), not critical
         expect(result.level).not.toBe('critical');
     });
@@ -51,13 +51,13 @@ describe('computeHealthScore: Rule 2 (context >= 50 + turns > 20)', () => {
 
 // ── Rule 3 (moderate context + moderate turns = degrading) ─────────────────
 
-describe('computeHealthScore: Rule 3 (context >= 50 + turns > 10)', () => {
-    test('at threshold: 50% + 11 turns = degrading', () => {
-        expect(computeHealthScore({ contextPct: 50, turnCount: 11, growthRate: null }).level).toBe('degrading');
+describe('computeHealthScore: Rule 3 (context >= 70 + turns > 10)', () => {
+    test('at threshold: 70% + 11 turns = degrading', () => {
+        expect(computeHealthScore({ contextPct: 70, turnCount: 11, growthRate: null }).level).toBe('degrading');
     });
 
-    test('below turn threshold: 50% + 10 turns = healthy (not degrading from rule 3)', () => {
-        const result = computeHealthScore({ contextPct: 50, turnCount: 10, growthRate: null });
+    test('below turn threshold: 70% + 10 turns = healthy (not degrading from rule 3)', () => {
+        const result = computeHealthScore({ contextPct: 70, turnCount: 10, growthRate: null });
         expect(result.level).toBe('healthy');
     });
 });

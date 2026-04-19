@@ -125,9 +125,9 @@ describe('agent pipeline: healthy mid-conversation', () => {
         expect(stale).toBeUndefined();
     });
 
-    it('health agent returns degrading (12 turns, 55% context)', () => {
-        // contextPct(55) >= HEALTHY_CEIL(50) && turnCount(12) > TURN_HEALTHY_CEIL(10)
-        expect(health.level).toBe('degrading');
+    it('health agent returns healthy (12 turns, 55% context)', () => {
+        // contextPct(55) < HEALTHY_CEIL(70): below threshold, healthy by default
+        expect(health.level).toBe('healthy');
     });
 
     it('delta coach returns no critical signals at 62% session', () => {
