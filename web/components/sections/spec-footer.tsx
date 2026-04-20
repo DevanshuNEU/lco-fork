@@ -69,7 +69,7 @@ export default function SpecFooter() {
               rel="noopener noreferrer"
               className="link-draw text-saar-secondary hover:text-saar-text"
             >
-              Devanshu Gandhi
+              Devanshu Chicholikar
             </a>
             . Solo. MS Software Engineering, Northeastern 2026.
           </div>
