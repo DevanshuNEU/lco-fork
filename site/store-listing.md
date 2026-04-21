@@ -1,4 +1,4 @@
-# Chrome Web Store Listing — Local Context Optimizer
+# Chrome Web Store Listing — Saar
 
 Reference file for the CWS developer dashboard submission.
 
@@ -6,27 +6,27 @@ Reference file for the CWS developer dashboard submission.
 
 ## Name
 
-Local Context Optimizer
+Saar
 
 ## Short description (132 chars max)
 
-See token count, cost, and context usage live on claude.ai. All counting happens locally — no data ever leaves your browser.
+See token count, cost, and context usage live on claude.ai. All counting happens locally. No data ever leaves your browser.
 
 ## Full description
 
 Claude strips token counts from its web UI. Every request fires an SSE stream containing your token usage, stop reasons, and context data — and Claude's interface discards all of it before you ever see it.
 
-Local Context Optimizer (LCO) intercepts that stream before the data disappears, counts tokens locally using Anthropic's own BPE vocabulary, and renders what you're spending in a live overlay directly on claude.ai.
+Saar intercepts that stream before the data disappears, counts tokens locally using Anthropic's own BPE vocabulary, and renders what you're spending in a live overlay directly on claude.ai.
 
 **What you see:**
 - Token count and estimated cost for every reply, updated live as Claude streams
 - Running session total across all conversations in the same tab
-- Context window utilization (how full your 200k context is)
+- Context window utilization (1M for Opus 4.7 and Sonnet 4.6, 200K for Haiku 4.5)
 - Message limit utilization when applicable
 - Smart nudges when context is filling up: warnings at 60%, 75%, and 90%
 
 **How it works:**
-LCO intercepts the fetch stream on claude.ai using a secure, sandboxed injected script. Token counting runs entirely inside your browser using a bundled BPE tokenizer — the same vocabulary Anthropic uses. No text, no messages, no personal data ever leaves your machine.
+Saar intercepts the fetch stream on claude.ai using a secure, sandboxed injected script. Token counting runs entirely inside your browser using a bundled BPE tokenizer — the same vocabulary Anthropic uses. No text, no messages, no personal data ever leaves your machine.
 
 **Privacy:**
 - Zero data collection. No analytics, no telemetry, no servers.
@@ -36,7 +36,7 @@ LCO intercepts the fetch stream on claude.ai using a secure, sandboxed injected 
 
 **Permissions:**
 - claude.ai access is optional and requested at runtime — the extension does nothing until you explicitly enable it.
-- storage, tabs, scripting, and alarms are used solely for local token counting and session cleanup.
+- storage, tabs, scripting, alarms, unlimitedStorage, and sidePanel are used solely for local token counting, session cleanup, and the side panel UI.
 
 ---
 
@@ -50,11 +50,11 @@ English
 
 ## Privacy policy URL
 
-https://lco.opencodeintel.com/privacy
+https://getsaar.com/privacy
 
 ## Homepage URL
 
-https://lco.opencodeintel.com
+https://getsaar.com
 
 ---
 
@@ -89,12 +89,11 @@ Source code: https://github.com/OpenCodeIntel/lco
 
 ---
 
-## Screenshots needed (1280x800 or 640x400)
+## Screenshots (1280x800 — save to docs/cws-assets/)
 
-1. Overlay on claude.ai mid-conversation showing token count + cost
-2. Context bar at ~70% with the amber nudge visible
-3. Session totals after multiple requests
-4. Collapsed overlay (mini cost view)
+1. `docs/cws-assets/screenshot-1-overlay.png` — overlay mid-conversation showing live token count and cost
+2. `docs/cws-assets/screenshot-2-threshold.png` — context bar near warning threshold (amber nudge visible)
+3. `docs/cws-assets/screenshot-3-session-totals.png` — session totals after multiple requests
 
 ## Icons
 
