@@ -1,6 +1,6 @@
 'use client'
 
-import { useScroll, useTransform, useMotionValue, useSpring } from 'framer-motion'
+import { useScroll } from 'framer-motion'
 import { useRef, useEffect, useState } from 'react'
 import SaarCard from '@/components/ui/saar-card'
 import type { HealthStatus } from '@/lib/tokens'
