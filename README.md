@@ -17,24 +17,24 @@ lco intercepts Claude's API stream before the UI strips it, counts tokens locall
 └─────────────────────────────────────────┘
 ```
 
-- **Live token counts** — input and output, every 200ms as Claude responds
-- **Per-request cost** — BPE counts at stream end, not estimated
-- **Context window bar** — how much of the 200K window this conversation has consumed
-- **Session totals** — cumulative cost and request count for the tab
-- **Message limit bar** — fills amber as you approach Claude's usage cap, pulled from the API directly
+- **Live token counts:** input and output, every 200ms as Claude responds
+- **Per-request cost:** BPE counts at stream end, not estimated
+- **Context window bar:** how much of the 200K window this conversation has consumed
+- **Session totals:** cumulative cost and request count for the tab
+- **Message limit bar:** fills amber as you approach Claude's usage cap, pulled from the API directly
 
 ---
 
 ## Context rot
 
-You open a conversation. Paste in a file. Ask a follow-up, then another. Two hours later you're sending 40,000 tokens of context per message — and Claude's giving you worse answers because the useful signal is buried under noise.
+You open a conversation. Paste in a file. Ask a follow-up, then another. Two hours later you're sending 40,000 tokens of context per message. Claude's giving you worse answers because the useful signal is buried under noise.
 
 Nobody told you this was happening.
 
 ```
 March invoice: $247.83
 April invoice: $189.42
-"I thought I was being careful." — every developer, every month
+"I thought I was being careful." - every developer, every month
 ```
 
 lco tells you.
@@ -49,16 +49,16 @@ Chrome MV3 forces three isolated JavaScript contexts. lco uses that structure in
 
 > **Diagram source:** [.github/assets/architecture.excalidraw](.github/assets/architecture.excalidraw)
 
-**Room 1: MAIN World** (`inject.ts`) — Intercepts `window.fetch`. Tees the SSE stream so Claude's UI gets an identical copy and never knows we were here. Decodes events and posts batches every 200ms.
+**Room 1: MAIN World** (`inject.ts`): Intercepts `window.fetch`. Tees the SSE stream so Claude's UI gets an identical copy and never knows we were here. Decodes events and posts batches every 200ms.
 
-**Room 2: Content Script** (`claude-ai.content.ts`) — Five-layer validation on every postMessage. Renders the overlay in a closed Shadow DOM.
+**Room 2: Content Script** (`claude-ai.content.ts`): Five-layer validation on every postMessage. Renders the overlay in a closed Shadow DOM.
 
-**Room 3: Service Worker** (`background.ts`) — Runs js-tiktoken with Anthropic's BPE vocab. Writes per-tab state to `chrome.storage.session`. Computes cost.
+**Room 3: Service Worker** (`background.ts`): Runs js-tiktoken with Anthropic's BPE vocab. Writes per-tab state to `chrome.storage.session`. Computes cost.
 
 ### The fetch intercept
 
 ```javascript
-// inject.ts — runs inside claude.ai's page context
+// inject.ts: runs inside claude.ai's page context
 const originalFetch = window.fetch;
 
 window.fetch = async function (input, init) {
@@ -68,7 +68,7 @@ window.fetch = async function (input, init) {
     const response = await originalFetch.call(this, input, init);
 
     if (response.body) {
-      // .tee() duplicates the stream — one for Claude's UI, one for lco.
+      // .tee() splits the stream: one copy for Claude's UI, one for lco.
       const [pageStream, monitorStream] = response.body.tee();
       decodeSSEStream(monitorStream, model, prompt);
       return new Response(pageStream, response);
@@ -95,7 +95,7 @@ All five must pass or the message is silently dropped. Content scripts process e
 
 ### Token counting
 
-Real-time display uses `chars / 4` — fast, synchronous, close enough for the overlay. At stream end, accurate BPE fires:
+Real-time display uses `chars / 4`: fast, synchronous, close enough for the overlay. At stream end, accurate BPE fires:
 
 ```typescript
 const [inputCount, outputCount] = await Promise.all([
@@ -137,7 +137,7 @@ Load in Chrome:
 
 1. Go to `chrome://extensions`
 2. Turn on **Developer mode**
-3. **Load unpacked** — select `.output/chrome-mv3`
+3. **Load unpacked:** select `.output/chrome-mv3`
 4. Open `claude.ai`
 
 For hot reload during development:
@@ -156,9 +156,9 @@ See [SETUP.md](SETUP.md) for troubleshooting.
 
 Claude-only right now. Multi-provider is the point.
 
-- **ChatGPT adapter** — same architecture, different endpoint
-- **Coaching nudges** — tell you when to start a new chat, not just how full you are
-- **Cross-session history** — token trends over time, not just per-browser-session data that clears on close
+- **ChatGPT adapter:** same architecture, different endpoint
+- **Coaching nudges:** tell you when to start a new chat, not just how full you are
+- **Cross-session history:** token trends over time, not just per-browser-session data that clears on close
 - **Firefox**
 
 If your workflow touches more than one AI tool, lco should cover all of them.
