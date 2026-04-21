@@ -8,13 +8,19 @@ interface WaitlistBody {
 }
 
 // Per-instance rate limiter: max 5 submissions per IP per 60s window.
-// In-memory — resets on cold start. Production: replace with Vercel KV or middleware.
+// In-memory, resets on cold start. Production: replace with Vercel KV or middleware.
 const ipLog = new Map<string, { count: number; windowStart: number }>()
 const RATE_LIMIT = 5
 const WINDOW_MS = 60_000
 
 function isRateLimited(ip: string): boolean {
   const now = Date.now()
+
+  // Prune expired entries to prevent unbounded Map growth in warm instances.
+  for (const [key, val] of ipLog) {
+    if (now - val.windowStart > WINDOW_MS) ipLog.delete(key)
+  }
+
   const entry = ipLog.get(ip)
   if (!entry || now - entry.windowStart > WINDOW_MS) {
     ipLog.set(ip, { count: 1, windowStart: now })
@@ -27,9 +33,12 @@ function isRateLimited(ip: string): boolean {
 
 export async function POST(request: Request): Promise<NextResponse> {
   const headersList = await headers()
+
+  // Prefer x-real-ip (Vercel's verified client IP) over x-forwarded-for,
+  // which can be spoofed by including a fake IP as the first entry.
   const ip =
-    headersList.get('x-forwarded-for')?.split(',')[0]?.trim() ??
     headersList.get('x-real-ip') ??
+    headersList.get('x-forwarded-for')?.split(',').at(-1)?.trim() ??
     'unknown'
 
   if (isRateLimited(ip)) {
