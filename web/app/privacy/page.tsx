@@ -86,11 +86,36 @@ export default function PrivacyPage() {
 
       <section className="mb-8">
         <h2 className="text-saar-text font-medium text-lg mb-3">Third-party services</h2>
-        <p className="text-saar-secondary leading-relaxed">
+        <p className="text-saar-secondary leading-relaxed mb-3">
           Saar does not integrate with any third-party analytics, advertising, or data collection
           service. The BPE tokenizer vocabulary (
           <code className="text-saar-accent font-mono text-sm">claude.json</code>) is bundled
           inside the extension and does not make network requests.
+        </p>
+        <p className="text-saar-secondary leading-relaxed">
+          <strong className="text-saar-text">Feedback submissions (optional):</strong> The side
+          panel includes a voluntary feedback form. If you choose to submit feedback, your typed
+          message and the extension version number are sent to{' '}
+          <a
+            href="https://formspree.io"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-saar-accent hover:underline"
+          >
+            Formspree
+          </a>{' '}
+          (formspree.io), a third-party form processing service. No other data is included.
+          Submission is entirely opt-in and requires an explicit click. Formspree&apos;s privacy
+          policy is at{' '}
+          <a
+            href="https://formspree.io/legal/privacy-policy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-saar-accent hover:underline"
+          >
+            formspree.io/legal/privacy-policy
+          </a>
+          .
         </p>
       </section>
 
