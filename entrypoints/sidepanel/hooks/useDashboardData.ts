@@ -324,7 +324,9 @@ export function useDashboardData(): DashboardData {
                     // history depth but is fire-and-forget and fine at 90-day scale. [GET-18]
                     const orgId = orgIdRef.current;
                     if (orgId) {
-                        void computeDailySummary(orgId, todayDateString()).catch(() => {});
+                        void computeDailySummary(orgId, todayDateString()).catch((err) => {
+                            console.error('[Saar] Failed to recompute daily summary on turn:', err);
+                        });
                     }
                 }
                 if (hasDailyChange) {
