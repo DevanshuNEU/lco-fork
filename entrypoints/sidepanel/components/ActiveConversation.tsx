@@ -79,7 +79,7 @@ export default function ActiveConversation({ conv, health }: Props) {
 
             <div className="lco-dash-active-stats">
                 <span>{conv.turnCount} turn{conv.turnCount === 1 ? '' : 's'}</span>
-                <span>{formatTokens(conv.totalInputTokens + conv.totalOutputTokens)} tokens</span>
+                <span>{formatTokens(conv.totalInputTokens + conv.totalOutputTokens)} tok</span>
                 {showDelta
                     ? <span>{totalDelta.toFixed(1)}% of session</span>
                     : <span>{formatCost(conv.estimatedCost)}</span>

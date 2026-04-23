@@ -1,5 +1,5 @@
 // entrypoints/sidepanel/components/TodayCard.tsx
-// Today's aggregate stats in a 2x2 grid.
+// Today's aggregate stats as a single dense row matching overlay typography.
 
 import React from 'react';
 import type { DailySummary } from '../../../lib/conversation-store';
@@ -18,22 +18,10 @@ export default function TodayCard({ summary }: Props) {
 
     return (
         <div className={`lco-dash-today ${isEmpty ? 'lco-dash-today--empty' : ''}`}>
-            <div className="lco-dash-metric">
-                <span className="lco-dash-metric-value">{conversations}</span>
-                <span className="lco-dash-metric-label">Conversations</span>
-            </div>
-            <div className="lco-dash-metric">
-                <span className="lco-dash-metric-value">{turns}</span>
-                <span className="lco-dash-metric-label">Turns</span>
-            </div>
-            <div className="lco-dash-metric">
-                <span className="lco-dash-metric-value">{formatTokens(tokens)}</span>
-                <span className="lco-dash-metric-label">Tokens</span>
-            </div>
-            <div className="lco-dash-metric">
-                <span className="lco-dash-metric-value">{formatCost(cost)}</span>
-                <span className="lco-dash-metric-label">Cost</span>
-            </div>
+            <span className="lco-dash-today-label">today</span>
+            <span className="lco-dash-today-stats">
+                {conversations} conv · {turns} turn{turns !== 1 ? 's' : ''} · {formatTokens(tokens)} tok · {formatCost(cost)}
+            </span>
         </div>
     );
 }

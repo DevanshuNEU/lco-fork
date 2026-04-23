@@ -50,7 +50,7 @@
 
 body {
     font-family: var(--lco-font);
-    font-size: 13px;
+    font-size: 11px;
     line-height: 1.5;
     color: var(--lco-text);
     background: var(--lco-bg);
@@ -208,66 +208,41 @@ body {
 /* ── Today card ─────────────────────────────────────────────────────────────── */
 
 .lco-dash-today {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    align-items: baseline;
     gap: 8px;
+    padding: 2px 0;
 }
 
 .lco-dash-today--empty {
     opacity: 0.5;
 }
 
-.lco-dash-metric {
-    background: var(--lco-bg-card);
-    border: 1px solid var(--lco-border);
-    border-radius: var(--lco-radius);
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+.lco-dash-today-label {
+    font-size: 10px;
+    color: var(--lco-text-muted);
+    flex-shrink: 0;
 }
 
-.lco-dash-metric:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-@media (prefers-color-scheme: dark) {
-    .lco-dash-metric:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-    }
-}
-
-.lco-dash-metric-value {
-    font-size: 20px;
-    font-weight: 700;
-    font-family: var(--lco-font-mono);
-    letter-spacing: -0.02em;
-    color: var(--lco-text);
-}
-
-.lco-dash-metric-label {
+.lco-dash-today-stats {
     font-size: 11px;
     color: var(--lco-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
 }
 
 /* ── Active conversation ────────────────────────────────────────────────────── */
 
 .lco-dash-active {
-    background: var(--lco-bg-card);
-    border: 1px solid var(--lco-border);
-    border-radius: var(--lco-radius);
-    padding: 12px;
+    padding: 8px 0;
     /* GPU-accelerated: only transform + opacity for 60/120fps compositing. */
     will-change: transform, opacity;
     transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
 }
 
 .lco-dash-active--empty {
-    border-style: dashed;
+    border: 1px dashed var(--lco-border);
+    border-radius: var(--lco-radius);
+    padding: 8px;
 }
 
 .lco-dash-active--hidden {
@@ -296,8 +271,8 @@ body {
 }
 
 .lco-dash-health-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
     /* No transition: health state changes snap instantly (rare, not per-frame). */
@@ -305,16 +280,16 @@ body {
 
 .lco-dash-health-dot--healthy   { background: var(--lco-health-green); box-shadow: 0 0 4px rgba(76, 175, 80, 0.4); }
 .lco-dash-health-dot--degrading { background: var(--lco-health-yellow); box-shadow: 0 0 4px rgba(245, 166, 35, 0.4); }
-.lco-dash-health-dot--critical  { background: var(--lco-health-red); box-shadow: 0 0 4px rgba(229, 57, 53, 0.4); }
+.lco-dash-health-dot--critical  { background: var(--lco-health-red); animation: lco-dot-pulse 2s ease-in-out infinite; }
 
 .lco-dash-health-label {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 500;
     color: var(--lco-text-secondary);
 }
 
 .lco-dash-active-subject {
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--lco-text);
     margin-bottom: 10px;
@@ -330,9 +305,9 @@ body {
 
 .lco-dash-context-bar {
     flex: 1;
-    height: 6px;
+    height: 4px;
     background: var(--lco-context-track);
-    border-radius: 3px;
+    border-radius: 2px;
     overflow: hidden;
 }
 
@@ -360,9 +335,15 @@ body {
 
 .lco-dash-active-stats {
     display: flex;
-    gap: 12px;
-    font-size: 12px;
+    font-size: 11px;
     color: var(--lco-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Dot separators between stat spans; avoids hardcoding · in JSX. */
+.lco-dash-active-stats > span + span::before {
+    content: ' · ';
+    color: var(--lco-text-muted);
 }
 
 /* ── Non-Claude tab banner ──────────────────────────────────────────────────── */
@@ -418,14 +399,14 @@ body {
 .lco-dash-budget-dot--critical    { background: var(--lco-health-red);    box-shadow: 0 0 4px rgba(229, 57, 53, 0.4); }
 
 .lco-dash-budget-zone-label {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 500;
     color: var(--lco-text-secondary);
 }
 
 /* Primary status line: "11% used; resets in 53 min" */
 .lco-dash-budget-status {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 500;
     color: var(--lco-text);
     margin-bottom: 10px;
@@ -475,6 +456,7 @@ body {
     font-size: 11px;
     color: var(--lco-text-muted);
     font-family: var(--lco-font-mono);
+    font-variant-numeric: tabular-nums;
     width: 28px;        /* Fixed width so the percentage numbers don't shift layout */
     text-align: right;
     flex-shrink: 0;
@@ -532,7 +514,7 @@ body {
 }
 
 .lco-dash-conv-subject {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 500;
     color: var(--lco-text);
     flex: 1;
@@ -568,6 +550,7 @@ body {
 .lco-dash-conv-turns,
 .lco-dash-conv-cost {
     font-family: var(--lco-font-mono);
+    font-variant-numeric: tabular-nums;
     font-size: 11px;
 }
 
@@ -699,6 +682,11 @@ body {
 
 /* ── Animations ─────────────────────────────────────────────────────────────── */
 
+@keyframes lco-dot-pulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(229, 57, 53, 0.4); }
+    50%      { box-shadow: 0 0 10px rgba(229, 57, 53, 0.7); }
+}
+
 @keyframes lco-dash-slide-in {
     from {
         opacity: 0;
@@ -727,8 +715,8 @@ body {
     .lco-dash-budget-fill {
         transition: none;
     }
-    .lco-dash-metric {
-        transition: none;
+    .lco-dash-health-dot--critical {
+        animation: none;
     }
     .lco-dash-skeleton {
         animation: none;
