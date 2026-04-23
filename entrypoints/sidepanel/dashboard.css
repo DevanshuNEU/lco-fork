@@ -64,6 +64,12 @@ body {
     max-width: 400px;
     margin: 0 auto;
     padding: 16px 12px;
+    /* Flex column + min-height keeps the feedback widget pinned to the viewport
+       bottom when sections are collapsed. When History is tall, the panel scrolls
+       and the widget sits naturally at the end of content (no overlap, no stickiness). */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .lco-dash-loading {
@@ -559,7 +565,10 @@ body {
 /* Open: textarea + cancel/send. Sent: green confirmation, auto-resets in 4s.   */
 
 .lco-dash-feedback {
-    margin-top: 12px;
+    /* margin-top: auto fills available flex space, pushing the widget to the
+       viewport bottom when content is short. Collapses to 0 when content fills
+       the panel, so History (if expanded) still has border-top separation below it. */
+    margin-top: auto;
     padding-top: 12px;
     border-top: 1px solid var(--lco-border);
     padding-bottom: 4px;
