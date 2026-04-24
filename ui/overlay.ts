@@ -7,6 +7,7 @@
 import { OVERLAY_CSS } from './overlay-styles';
 import type { OverlayState } from '../lib/overlay-state';
 import type { ContextSignal } from '../lib/context-intelligence';
+import { classifyZone } from '../lib/usage-budget';
 
 export interface OverlayHandle {
     mount(shadow: ShadowRoot): void;
@@ -57,6 +58,9 @@ export function createOverlay(): OverlayHandle {
     let elDraftValue: HTMLElement | null = null;
     let elDraftCompare: HTMLElement | null = null;
     let elDraftWarning: HTMLElement | null = null;
+    let elWeeklyRow: HTMLElement | null = null;
+    let elWeeklyFill: HTMLElement | null = null;
+    let elWeeklyLabel: HTMLElement | null = null;
 
     function mount(shadow: ShadowRoot): void {
         const style = document.createElement('style');
@@ -211,6 +215,26 @@ export function createOverlay(): OverlayHandle {
         limitRow.appendChild(limitTrack);
         limitRow.appendChild(limitLabel);
         body.appendChild(limitRow);
+
+        // Weekly cap bar — hidden until usageBudget is available
+        const weeklyRow = document.createElement('div');
+        weeklyRow.className = 'lco-bar-row lco-weekly-row';
+        weeklyRow.style.display = 'none';
+        elWeeklyRow = weeklyRow;
+        const weeklyTrack = document.createElement('div');
+        weeklyTrack.className = 'lco-bar-track';
+        const weeklyFill = document.createElement('div');
+        weeklyFill.className = 'lco-bar-fill';
+        weeklyFill.style.transform = 'scaleX(0)';
+        elWeeklyFill = weeklyFill;
+        weeklyTrack.appendChild(weeklyFill);
+        const weeklyLabel = document.createElement('span');
+        weeklyLabel.className = 'lco-bar-label';
+        weeklyLabel.textContent = '—% weekly';
+        elWeeklyLabel = weeklyLabel;
+        weeklyRow.appendChild(weeklyTrack);
+        weeklyRow.appendChild(weeklyLabel);
+        body.appendChild(weeklyRow);
 
         // Divider — hidden until first request completes
         const divider = document.createElement('div');
@@ -382,6 +406,18 @@ export function createOverlay(): OverlayHandle {
                 const pct = Math.min(state.messageLimitUtilization! * 100, 100);
                 elLimitFill.style.transform = `scaleX(${pct / 100})`;
                 elLimitLabel.textContent = `${pct.toFixed(0)}% limit`;
+            }
+        }
+
+        if (elWeeklyRow && elWeeklyFill && elWeeklyLabel) {
+            const budget = state.usageBudget;
+            const visible = budget !== null;
+            elWeeklyRow.style.display = visible ? '' : 'none';
+            if (visible) {
+                const pct = Math.min(Math.max(budget!.weeklyPct, 0), 100);
+                elWeeklyFill.style.transform = `scaleX(${pct / 100})`;
+                elWeeklyFill.className = `lco-bar-fill lco-bar-fill--${classifyZone(pct)}`;
+                elWeeklyLabel.textContent = `${Math.round(pct)}% weekly`;
             }
         }
 
