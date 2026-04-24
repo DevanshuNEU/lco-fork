@@ -2,10 +2,11 @@
 // Thin orchestrator: validates bridge messages, drives state transitions, renders overlay.
 // All logic lives in imported modules; this file only wires them together.
 
-import type { LcoBridgeMessage, StoreTokenBatchMessage, StoreMessageLimitMessage, StoreTokenBatchResponse, RecordTurnMessage, FinalizeConversationMessage, SetActiveConvMessage, StoreUsageLimitsMessage } from '../lib/message-types';
+import type { LcoBridgeMessage, StoreTokenBatchMessage, StoreMessageLimitMessage, StoreTokenBatchResponse, RecordTurnMessage, FinalizeConversationMessage, SetActiveConvMessage, StoreUsageLimitsMessage, UsageLimitsData, UsageBudgetResult } from '../lib/message-types';
 import { LCO_NAMESPACE } from '../lib/message-types';
 import { isValidBridgeSchema } from '../lib/bridge-validation';
-import { INITIAL_STATE, applyTokenBatch, applyStreamComplete, applyStorageResponse, applyHealthBroken, applyHealthRecovered, applyMessageLimit, applyRestoredConversation, applyDraftEstimate, clearDraftEstimate } from '../lib/overlay-state';
+import { INITIAL_STATE, applyTokenBatch, applyStreamComplete, applyStorageResponse, applyHealthBroken, applyHealthRecovered, applyMessageLimit, applyRestoredConversation, applyDraftEstimate, clearDraftEstimate, applyUsageBudget } from '../lib/overlay-state';
+import { computeUsageBudget } from '../lib/usage-budget';
 import { computePreSubmitEstimate } from '../lib/pre-submit';
 import { createOverlay } from '../ui/overlay';
 import { showEnableBanner } from '../ui/enable-banner';
@@ -59,20 +60,22 @@ async function fetchStoredRecord(orgId: string | null, conversationId: string): 
 
 /**
  * Fetch the Anthropic usage limits for this account, forward to background for
- * storage, and return the 5-hour session utilization percentage.
+ * storage, and return a UsageBudgetResult (session + weekly utilization with
+ * reset metadata), or null on any failure.
  *
  * The usage endpoint returns exact session and weekly utilization with reset
  * timestamps — the same data shown on claude.ai/settings/limits.
  *
  * Called on ORGANIZATION_DETECTED (page load) and after each STREAM_COMPLETE.
- * The returned utilization value is used for delta tracking: the caller snapshots
- * the before-value, calls this, and subtracts to get the exact session cost of
- * the last message.
+ * Callers use result.sessionPct for delta tracking: snapshot the before-value,
+ * call this, and subtract to get the exact session cost of the last message.
+ * result.weeklyPct drives the overlay weekly-cap bar and the side panel
+ * Usage Budget card.
  *
  * Returns null on any failure (network error, malformed response). The caller
  * treats null as "delta uncomputable" and records the turn without a delta.
  */
-async function fetchAndStoreUsageLimits(orgId: string): Promise<number | null> {
+async function fetchAndStoreUsageLimits(orgId: string): Promise<UsageBudgetResult | null> {
     try {
         const response = await fetch(`/api/organizations/${orgId}/usage`, { credentials: 'same-origin' });
         if (!response.ok) return null;
@@ -94,7 +97,13 @@ async function fetchAndStoreUsageLimits(orgId: string): Promise<number | null> {
             sevenDayUtilization: sevenDay.utilization,
             sevenDayResetsAt: sevenDay.resets_at,
         } satisfies StoreUsageLimitsMessage).catch(() => { /* non-critical */ });
-        return fiveHour.utilization;
+        const capturedAt = Date.now();
+        const limits: UsageLimitsData = {
+            fiveHour: { utilization: fiveHour.utilization, resetsAt: fiveHour.resets_at },
+            sevenDay: { utilization: sevenDay.utilization, resetsAt: sevenDay.resets_at },
+            capturedAt,
+        };
+        return computeUsageBudget(limits, capturedAt);
     } catch {
         // Network errors are silently ignored; the dashboard shows stale data.
         return null;
@@ -281,11 +290,15 @@ async function initializeMonitoring(): Promise<void> {
                 }
 
                 // Fetch usage limits now that we have the org ID. Populates the
-                // Usage Budget card in the side panel immediately on load.
-                // Capture the returned utilization as the initial before-snapshot
-                // so the first STREAM_COMPLETE can compute a delta.
-                fetchAndStoreUsageLimits(currentOrgId).then(u => {
-                    if (u !== null) lastKnownUtilization = u;
+                // Usage Budget card in the side panel and weekly bar on the overlay.
+                // Capture sessionPct as the initial before-snapshot so the first
+                // STREAM_COMPLETE can compute a delta.
+                fetchAndStoreUsageLimits(currentOrgId).then(budget => {
+                    if (budget !== null) {
+                        lastKnownUtilization = budget.sessionPct;
+                        state = applyUsageBudget(state, budget);
+                        overlay.render(state);
+                    }
                 });
 
                 // Pre-fetch token economics for the Delta Coach and Prompt Agent.
@@ -453,7 +466,8 @@ async function initializeMonitoring(): Promise<void> {
 
                 // fetchAndStoreUsageLimits catches all errors internally; it never
                 // throws. The .then() always runs.
-                fetchAndStoreUsageLimits(orgId).then(utilizationAfter => {
+                fetchAndStoreUsageLimits(orgId).then(budgetAfter => {
+                    const utilizationAfter = budgetAfter?.sessionPct ?? null;
                     // Update the cached value so the next STREAM_COMPLETE has a
                     // fresh before-snapshot. Only update on valid (non-null) reads.
                     if (utilizationAfter !== null) {
@@ -472,11 +486,19 @@ async function initializeMonitoring(): Promise<void> {
                         deltaUtilization = utilizationAfter - utilizationBefore;
                     }
 
+                    // Apply fresh budget to overlay state. Combine with delta update in
+                    // one state object so the render below covers both changes.
+                    if (budgetAfter !== null) {
+                        state = applyUsageBudget(state, budgetAfter);
+                    }
+
                     // Update overlay immediately with the exact session cost for
                     // this reply. Re-render so the user sees "X.X% of session" the
                     // moment the usage endpoint responds (typically < 200ms post-stream).
                     if (deltaUtilization !== null) {
                         state = { ...state, lastDeltaUtilization: deltaUtilization };
+                    }
+                    if (budgetAfter !== null || deltaUtilization !== null) {
                         overlay.render(state);
                     }
 
