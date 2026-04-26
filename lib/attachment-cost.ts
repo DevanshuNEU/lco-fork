@@ -27,7 +27,12 @@ import { isKnownModel, getContextWindowSize } from './pricing';
 
 export type AttachmentDescriptor =
     | { kind: 'image'; width: number; height: number; sourceLabel: string }
-    | { kind: 'pdf'; pageCount: number; sourceLabel: string };
+    /**
+     * pageCount is null when local parsing failed (encrypted, fully-compressed
+     * page tree, malformed). The agent emits an unknown-cost breakdown row in
+     * that case so the user still sees the file is tracked.
+     */
+    | { kind: 'pdf'; pageCount: number | null; sourceLabel: string };
 
 /** One row in the per-attachment overlay breakdown. */
 export interface AttachmentBreakdownItem {
@@ -176,7 +181,7 @@ export function computeAttachmentCost(
                 breakdown.push({
                     kind: 'image',
                     tokens: 0,
-                    label: `image ${dims} (cost unknown for this model)`,
+                    label: `image ${dims}`,
                     unknown: true,
                 });
             } else {
@@ -186,6 +191,17 @@ export function computeAttachmentCost(
             }
         } else {
             hasPdf = true;
+            if (att.pageCount === null) {
+                // Page-count parsing failed; still surface the attachment so the
+                // user sees it is tracked. Contributes 0 tokens to the totals.
+                breakdown.push({
+                    kind: 'pdf',
+                    tokens: 0,
+                    label: 'PDF (page count unavailable)',
+                    unknown: true,
+                });
+                continue;
+            }
             pdfPageTotal += att.pageCount;
             const range = computePdfTokenRange(att.pageCount);
             totalLow += range.low;

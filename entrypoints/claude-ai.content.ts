@@ -733,14 +733,26 @@ async function initializeMonitoring(): Promise<void> {
     // by the length of every attached filename), tracks attachments via the
     // file input's change event, debounces pre-submit estimates.
 
-    function findFormParent(el: HTMLElement): HTMLElement | null {
+    /**
+     * Find the compose region: the smallest reasonable ancestor of the editor
+     * that wraps the attachment cards and the file input. claude.ai's modern
+     * React build does not always use a <form> element, so we accept three
+     * shapes: an actual FORM/FIELDSET (legacy), any ancestor whose subtree
+     * contains an <input type=file> (current), or a wide-but-bounded ancestor
+     * walk if neither matches. Returns null when no plausible parent exists,
+     * which only happens when the editor is detached from the DOM.
+     */
+    function findComposeRegion(el: HTMLElement): HTMLElement | null {
         let p: HTMLElement | null = el.parentElement;
-        for (let i = 0; i < 5 && p; i++) {
+        let widestSeen: HTMLElement | null = null;
+        for (let i = 0; i < 8 && p; i++) {
             const t = p.tagName;
             if (t === 'FIELDSET' || t === 'FORM') return p;
+            if (p.querySelector('input[type=file]')) return p;
+            widestSeen = p;
             p = p.parentElement;
         }
-        return null;
+        return widestSeen;
     }
 
     function fileKey(file: File): string {
@@ -872,10 +884,17 @@ async function initializeMonitoring(): Promise<void> {
                 });
             } else if (file.type === 'application/pdf') {
                 readPdfPageCount(file).then(pages => {
-                    if (pages === null || pages <= 0) return;
+                    // pages can be null when the PDF is encrypted, fully
+                    // compressed, or malformed. Track it anyway so the user
+                    // sees the file is registered; the agent renders an
+                    // unknown-cost row rather than dropping the attachment.
                     attachmentMap.set(key, {
                         filename: file.name,
-                        descriptor: { kind: 'pdf', pageCount: pages, sourceLabel: file.name },
+                        descriptor: {
+                            kind: 'pdf',
+                            pageCount: pages !== null && pages > 0 ? pages : null,
+                            sourceLabel: file.name,
+                        },
                     });
                     recomputeDraft();
                 });
@@ -889,20 +908,13 @@ async function initializeMonitoring(): Promise<void> {
         if (box) {
             composeBoxRef = box;
             box.addEventListener('input', onComposeInput);
-            const parent = findFormParent(box);
+            const parent = findComposeRegion(box);
             if (parent) {
                 composeFormRef = parent;
                 // Attachment-card adds and removes flow through DOM mutations.
                 // Reuse onComposeInput so the same debounce path covers both.
                 attachmentObserver = new MutationObserver(onComposeInput);
                 attachmentObserver.observe(parent, { childList: true, subtree: true });
-                // File-input change events fire when the user picks an image
-                // or PDF; capture-phase delegation catches all <input type=file>
-                // descendants without needing to re-bind on every observer hit.
-                if (!fileChangeListenerAttached) {
-                    parent.addEventListener('change', handleFileChange, true);
-                    fileChangeListenerAttached = true;
-                }
             }
             composeObserver?.disconnect();
             composeObserver = null;
@@ -915,6 +927,18 @@ async function initializeMonitoring(): Promise<void> {
     }
 
     discoverComposeBox();
+
+    // Document-level capture for file-input change events. claude.ai's compose
+    // form is a deeply-nested set of divs (no <form> tag) and the file input
+    // can live outside the editor's immediate ancestor chain, so per-region
+    // attachment was missing the event entirely. Capture-phase at document
+    // level catches every change before it bubbles, regardless of where the
+    // input sits relative to the editor. The listener is attached once and
+    // never removed; it is harmless when no compose box has been discovered.
+    if (!fileChangeListenerAttached) {
+        document.documentElement.addEventListener('change', handleFileChange, true);
+        fileChangeListenerAttached = true;
+    }
 
     // Reset overlay, conversation state, and dismissed nudges on SPA navigation (Chrome 102+).
     // Also finalize the previous conversation and detect the new one.
@@ -957,11 +981,13 @@ async function initializeMonitoring(): Promise<void> {
             overlay.hideNudge();
 
             // Re-discover the compose box: SPA navigation replaces the DOM.
+            // The document-level file-change listener stays attached across
+            // navigations (document.documentElement is stable), so we do not
+            // reset fileChangeListenerAttached here.
             if (composeObserver) { composeObserver.disconnect(); composeObserver = null; }
             if (attachmentObserver) { attachmentObserver.disconnect(); attachmentObserver = null; }
             composeBoxRef = null;
             composeFormRef = null;
-            fileChangeListenerAttached = false;
             attachmentMap.clear();
             if (draftDebounceTimer) { clearTimeout(draftDebounceTimer); draftDebounceTimer = null; }
             discoverComposeBox();

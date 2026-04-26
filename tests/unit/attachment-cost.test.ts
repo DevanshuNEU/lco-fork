@@ -188,6 +188,29 @@ describe('computeAttachmentCost', () => {
         expect(r.breakdown[0].tokens).toBe(0);
     });
 
+    it('PDF with null page count surfaces an unknown breakdown', () => {
+        const r = computeAttachmentCost(
+            [{ kind: 'pdf', pageCount: null, sourceLabel: 'encrypted.pdf' }],
+            'claude-sonnet-4-6',
+        );
+        expect(r.hasPdf).toBe(true);
+        expect(r.totalTokensLow).toBe(0);
+        expect(r.totalTokensHigh).toBe(0);
+        expect(r.breakdown).toHaveLength(1);
+        expect(r.breakdown[0].unknown).toBe(true);
+        expect(r.breakdown[0].label).toContain('unavailable');
+    });
+
+    it('null-page PDF mixed with parseable PDF only counts the parseable one', () => {
+        const r = computeAttachmentCost([
+            { kind: 'pdf', pageCount: null, sourceLabel: 'a.pdf' },
+            { kind: 'pdf', pageCount: 3, sourceLabel: 'b.pdf' },
+        ], 'claude-sonnet-4-6');
+        expect(r.totalTokensLow).toBe(3 * 1500);
+        expect(r.totalTokensHigh).toBe(3 * 3000);
+        expect(r.breakdown).toHaveLength(2);
+    });
+
     it('warns when PDF pages exceed 100-page cap on a 200K model (Haiku)', () => {
         const r = computeAttachmentCost([pdf(150)], 'claude-haiku-4-5');
         expect(r.warnings.length).toBeGreaterThan(0);
