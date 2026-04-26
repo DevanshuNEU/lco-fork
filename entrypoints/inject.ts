@@ -553,7 +553,18 @@ export default defineUnlistedScript(() => {
 
                 const response = await nativeFetch.call(this, input, init);
 
-                if (response.body) {
+                // Only tee + decode when the response is an actual SSE stream.
+                // claude.ai may return 429 (rate limit), 5xx, or a captcha/CDN
+                // HTML page through the same endpoint. Feeding non-SSE bytes
+                // into decodeSSEStream silently fails: the decoder finds no
+                // event lines, the watchdog fires after 120s, and the overlay
+                // sits stuck on the previous turn's state. Returning the
+                // original response unmodified lets claude.ai handle the
+                // error itself and leaves the overlay in its last healthy state.
+                const contentType = response.headers.get('content-type') ?? '';
+                const isSseStream = response.status === 200 && contentType.includes('event-stream');
+
+                if (response.body && isSseStream) {
                     const [pageStream, monitorStream] = response.body.tee();
                     const cleanResponse = new Response(pageStream, {
                         status: response.status,
