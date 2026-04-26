@@ -309,6 +309,105 @@ describe('attachments', () => {
     });
 });
 
+// ── Context-window projection (Anthropic "dense PDFs fill context") ─────────
+
+describe('context-window projection', () => {
+    it('exposes contextWindowSize from the model', () => {
+        const r = computePreSubmitEstimate(makeInput({ model: 'claude-sonnet-4-6' }));
+        expect(r!.contextWindowSize).toBe(1_000_000);
+    });
+
+    it('200K models reflect the smaller window', () => {
+        const r = computePreSubmitEstimate(makeInput({
+            model: 'claude-haiku-4-5',
+            pctPerInputToken: { 'claude-haiku-4-5': 0.01 },
+        }));
+        expect(r!.contextWindowSize).toBe(200_000);
+    });
+
+    it('projects context % from history + this turn (low and high)', () => {
+        // currentContext 40%, text adds 50 tokens (~0.005% of 1M).
+        // PDF range 1500-3000 tokens (0.15%-0.3% of 1M).
+        // Expected: low ~40.005%, high ~40.305%.
+        const r = computePreSubmitEstimate(makeInput({
+            currentContextPct: 40,
+            attachmentTokensLow: 1500,
+            attachmentTokensHigh: 3000,
+            attachmentBreakdown: [{ kind: 'pdf', tokens: 1500, tokensHigh: 3000, label: 'PDF 1 page' }],
+            hasPdf: true,
+        }));
+        expect(r!.projectedContextPctLow!).toBeCloseTo(40 + 0.155, 2);
+        expect(r!.projectedContextPctHigh!).toBeCloseTo(40 + 0.305, 2);
+    });
+
+    it('emits contextOverrunWarning when high projection >= 90% of context', () => {
+        // 491-page PDF on Sonnet (1M ctx) at 0% context: 491*1500=736.5k low,
+        // 491*3000=1.473M high. High projection: 147% of context.
+        const r = computePreSubmitEstimate(makeInput({
+            currentContextPct: 0,
+            draftCharCount: 0,
+            attachmentTokensLow: 491 * 1500,
+            attachmentTokensHigh: 491 * 3000,
+            attachmentBreakdown: [{
+                kind: 'pdf',
+                tokens: 491 * 1500,
+                tokensHigh: 491 * 3000,
+                label: 'PDF 491 pages',
+            }],
+            hasPdf: true,
+        }));
+        expect(r!.contextOverrunWarning).not.toBeNull();
+        expect(r!.contextOverrunWarning).toContain('exceeds');
+        expect(r!.contextOverrunWarning).toContain('1000k');
+    });
+
+    it('emits soft "would fill" wording when projection is between 90% and 100%', () => {
+        // currentContext 80%, draft adds tokens that push high projection
+        // into the 90-100% band on a 1M model.
+        const r = computePreSubmitEstimate(makeInput({
+            currentContextPct: 80,
+            attachmentTokensLow: 100_000,
+            attachmentTokensHigh: 150_000,
+            attachmentBreakdown: [{
+                kind: 'pdf', tokens: 100_000, tokensHigh: 150_000, label: 'PDF',
+            }],
+            hasPdf: true,
+        }));
+        expect(r!.contextOverrunWarning).not.toBeNull();
+        expect(r!.contextOverrunWarning).toContain('would fill');
+        expect(r!.contextOverrunWarning).toContain('splitting');
+    });
+
+    it('no warning when projection is comfortably under 90%', () => {
+        const r = computePreSubmitEstimate(makeInput({
+            currentContextPct: 10,
+            attachmentTokensLow: 50_000,
+            attachmentTokensHigh: 50_000,
+            attachmentBreakdown: [{ kind: 'image', tokens: 50_000, label: 'image' }],
+        }));
+        expect(r!.contextOverrunWarning).toBeNull();
+    });
+
+    it('200K-context model fires earlier with the same PDF', () => {
+        // 50-page PDF: 75k low, 150k high. On Haiku (200k), high = 75% of ctx.
+        // Below 90% threshold, no warning. But add some history.
+        const dense = computePreSubmitEstimate(makeInput({
+            model: 'claude-haiku-4-5',
+            pctPerInputToken: { 'claude-haiku-4-5': 0.01 },
+            currentContextPct: 20,
+            attachmentTokensLow: 50 * 1500,
+            attachmentTokensHigh: 50 * 3000,
+            attachmentBreakdown: [{
+                kind: 'pdf', tokens: 75_000, tokensHigh: 150_000, label: 'PDF 50 pages',
+            }],
+            hasPdf: true,
+        }));
+        // 20 + 150_000/200_000*100 = 20 + 75 = 95%, above threshold.
+        expect(dense!.contextOverrunWarning).not.toBeNull();
+        expect(dense!.contextOverrunWarning).toContain('200k');
+    });
+});
+
 // ── Backwards compatibility (DRAFT_ESTIMATE pre-send fallback) ───────────────
 
 describe('backwards compatibility', () => {

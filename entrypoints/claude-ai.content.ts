@@ -843,6 +843,7 @@ async function initializeMonitoring(): Promise<void> {
             model,
             pctPerInputToken: cachedPctPerInputToken,
             currentSessionPct: lastKnownUtilization ?? 0,
+            currentContextPct: state.contextPct ?? 0,
             attachmentTokensLow: cost.totalTokensLow,
             attachmentTokensHigh: cost.totalTokensHigh,
             attachmentBreakdown: cost.breakdown,
@@ -878,6 +879,7 @@ async function initializeMonitoring(): Promise<void> {
                             width: dims.width,
                             height: dims.height,
                             sourceLabel: file.name,
+                            fileSize: file.size,
                         },
                     });
                     recomputeDraft();
@@ -894,6 +896,7 @@ async function initializeMonitoring(): Promise<void> {
                             kind: 'pdf',
                             pageCount: pages !== null && pages > 0 ? pages : null,
                             sourceLabel: file.name,
+                            fileSize: file.size,
                         },
                     });
                     recomputeDraft();

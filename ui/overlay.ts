@@ -77,6 +77,27 @@ function formatBreakdownLine(item: AttachmentBreakdownItem): string {
     return `+${fmtTokensCompact(item.tokens)} from ${item.label}`;
 }
 
+/**
+ * Context-window projection line. Shows what share of the model's window the
+ * upcoming turn would occupy on top of the conversation history. Renders as
+ * a range when low and high differ (PDF range), otherwise a single number.
+ * Suppressed when both bounds round to the same integer percent.
+ */
+function formatContextProjection(
+    low: number | null,
+    high: number | null,
+    windowSize: number,
+): string {
+    if (low === null || high === null) return '';
+    const ctxK = windowSize >= 1_000_000
+        ? `${(windowSize / 1_000_000).toFixed(0)}M`
+        : `${Math.round(windowSize / 1000)}k`;
+    const lowR = Math.round(low);
+    const highR = Math.round(high);
+    if (lowR === highR) return `~${lowR}% of ${ctxK} context`;
+    return `~${lowR}% to ${highR}% of ${ctxK} context`;
+}
+
 export function createOverlay(): OverlayHandle {
     // DOM refs: null until mount() is called. render() is a no-op until then.
     let overlayWidget: HTMLDivElement | null = null;
@@ -105,6 +126,7 @@ export function createOverlay(): OverlayHandle {
     let nudgeHideTimer: ReturnType<typeof setTimeout> | null = null;
     let elDraftRow: HTMLElement | null = null;
     let elDraftValue: HTMLElement | null = null;
+    let elDraftContext: HTMLElement | null = null;
     let elDraftBreakdown: HTMLElement | null = null;
     let elDraftDisclosure: HTMLElement | null = null;
     let elDraftCompare: HTMLElement | null = null;
@@ -166,6 +188,15 @@ export function createOverlay(): OverlayHandle {
         draftRow.appendChild(lblDraft);
         draftRow.appendChild(valDraft);
         body.appendChild(draftRow);
+
+        // Context-window projection row: shows what fraction of the model's
+        // context window THIS turn would consume (history + draft + attachments).
+        // Hidden until the projection is non-trivial (>=1% of context).
+        const draftContext = document.createElement('div');
+        draftContext.className = 'lco-draft-context';
+        draftContext.style.display = 'none';
+        elDraftContext = draftContext;
+        body.appendChild(draftContext);
 
         // Draft per-attachment breakdown (hidden when no attachments).
         // One line per image or PDF, e.g. "+1.6k from image (1568x1568)".
@@ -433,12 +464,31 @@ export function createOverlay(): OverlayHandle {
             }
         }
         if (elDraftHardWarning) {
-            const hard = state.draftEstimate?.attachmentWarnings ?? [];
-            if (hard.length > 0) {
-                elDraftHardWarning.textContent = hard.join(' ');
+            // Fold the context-overrun warning into the same hard-warning row
+            // as PDF page-cap and request-size violations. All three are
+            // "this send may fail or truncate" issues; one prominent row keeps
+            // the user from missing any of them.
+            const draft = state.draftEstimate;
+            const hardParts: string[] = [];
+            if (draft?.contextOverrunWarning) hardParts.push(draft.contextOverrunWarning);
+            if (draft?.attachmentWarnings) hardParts.push(...draft.attachmentWarnings);
+            if (hardParts.length > 0) {
+                elDraftHardWarning.textContent = hardParts.join(' ');
                 elDraftHardWarning.style.display = '';
             } else {
                 elDraftHardWarning.style.display = 'none';
+            }
+        }
+        if (elDraftContext) {
+            const draft = state.draftEstimate;
+            const low = draft?.projectedContextPctLow ?? null;
+            const high = draft?.projectedContextPctHigh ?? null;
+            // Show the row when there is anything meaningful to display
+            // (projection >= 1% so we do not flash for one-character drafts).
+            const visible = high !== null && high >= 1;
+            elDraftContext.style.display = visible ? '' : 'none';
+            if (visible) {
+                elDraftContext.textContent = formatContextProjection(low, high, draft!.contextWindowSize);
             }
         }
 

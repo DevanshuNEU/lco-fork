@@ -128,10 +128,10 @@ describe('computePdfTokenRange', () => {
 // ── computeAttachmentCost: combined behavior ─────────────────────────────────
 
 describe('computeAttachmentCost', () => {
-    const img = (w: number, h: number, name = 'img.png'): AttachmentDescriptor =>
-        ({ kind: 'image', width: w, height: h, sourceLabel: name });
-    const pdf = (pages: number, name = 'doc.pdf'): AttachmentDescriptor =>
-        ({ kind: 'pdf', pageCount: pages, sourceLabel: name });
+    const img = (w: number, h: number, name = 'img.png', fileSize = 50_000): AttachmentDescriptor =>
+        ({ kind: 'image', width: w, height: h, sourceLabel: name, fileSize });
+    const pdf = (pages: number, name = 'doc.pdf', fileSize = 200_000): AttachmentDescriptor =>
+        ({ kind: 'pdf', pageCount: pages, sourceLabel: name, fileSize });
 
     it('empty list returns zero totals and empty breakdown', () => {
         const r = computeAttachmentCost([], 'claude-sonnet-4-6');
@@ -190,7 +190,7 @@ describe('computeAttachmentCost', () => {
 
     it('PDF with null page count surfaces an unknown breakdown', () => {
         const r = computeAttachmentCost(
-            [{ kind: 'pdf', pageCount: null, sourceLabel: 'encrypted.pdf' }],
+            [{ kind: 'pdf', pageCount: null, sourceLabel: 'encrypted.pdf', fileSize: 200_000 }],
             'claude-sonnet-4-6',
         );
         expect(r.hasPdf).toBe(true);
@@ -203,8 +203,8 @@ describe('computeAttachmentCost', () => {
 
     it('null-page PDF mixed with parseable PDF only counts the parseable one', () => {
         const r = computeAttachmentCost([
-            { kind: 'pdf', pageCount: null, sourceLabel: 'a.pdf' },
-            { kind: 'pdf', pageCount: 3, sourceLabel: 'b.pdf' },
+            { kind: 'pdf', pageCount: null, sourceLabel: 'a.pdf', fileSize: 200_000 },
+            { kind: 'pdf', pageCount: 3, sourceLabel: 'b.pdf', fileSize: 200_000 },
         ], 'claude-sonnet-4-6');
         expect(r.totalTokensLow).toBe(3 * 1500);
         expect(r.totalTokensHigh).toBe(3 * 3000);
@@ -239,5 +239,47 @@ describe('computeAttachmentCost', () => {
     it('breakdown labels include exact dimensions for images', () => {
         const r = computeAttachmentCost([img(1568, 1568)], 'claude-sonnet-4-6');
         expect(r.breakdown[0].label).toContain('1568x1568');
+    });
+
+    // ── Aggregate request-size warning (Anthropic 32 MB hard cap) ──────────
+
+    it('warns when aggregate file size approaches the 32 MB request cap', () => {
+        // 31 MB total: above the 30 MB warn threshold, below the 32 MB hard cap.
+        const r = computeAttachmentCost([
+            { kind: 'pdf', pageCount: 50, sourceLabel: 'big.pdf', fileSize: 31 * 1024 * 1024 },
+        ], 'claude-sonnet-4-6');
+        expect(r.warnings.length).toBeGreaterThan(0);
+        const w = r.warnings.find(s => s.includes('32 MB'));
+        expect(w).toBeDefined();
+        expect(w).toContain('approaching');
+    });
+
+    it('warns more strongly when aggregate file size exceeds the 32 MB hard cap', () => {
+        const r = computeAttachmentCost([
+            { kind: 'pdf', pageCount: 50, sourceLabel: 'huge.pdf', fileSize: 35 * 1024 * 1024 },
+        ], 'claude-sonnet-4-6');
+        const w = r.warnings.find(s => s.includes('32 MB'));
+        expect(w).toBeDefined();
+        expect(w).toContain('exceeds');
+    });
+
+    it('aggregates file size across multiple attachments', () => {
+        // Two 16 MB images add to 32 MB which is above the warn threshold.
+        const r = computeAttachmentCost([
+            { kind: 'image', width: 4000, height: 4000, sourceLabel: 'a.png', fileSize: 16 * 1024 * 1024 },
+            { kind: 'image', width: 4000, height: 4000, sourceLabel: 'b.png', fileSize: 16 * 1024 * 1024 },
+        ], 'claude-sonnet-4-6');
+        const w = r.warnings.find(s => s.includes('32 MB'));
+        expect(w).toBeDefined();
+        expect(w).toContain('32.0');
+    });
+
+    it('does not warn at small total file sizes', () => {
+        const r = computeAttachmentCost([
+            img(500, 500, 'a.png', 100_000),
+            pdf(5, 'b.pdf', 200_000),
+        ], 'claude-sonnet-4-6');
+        const w = r.warnings.find(s => s.includes('32 MB'));
+        expect(w).toBeUndefined();
     });
 });

@@ -177,6 +177,24 @@ Reused by the cost agent for warnings on both kinds of attachments.
 | Image file size | 5 MB API, 10 MB claude.ai | Vision FAQ |
 | Images per request | 100 (200K models) / 600 (1M models) | Vision doc |
 | Image formats | JPEG, PNG, GIF, WebP | Vision FAQ |
+| Total request size | 32 MB | PDF doc, "Maximum request size" |
+
+## Active warning thresholds
+
+These are the points at which the agent surfaces a hard warning. The numbers
+are pinned by tests; tighten only if Anthropic publishes a stricter limit.
+
+| Warning | Trigger | Source / rationale |
+|---|---|---|
+| PDF page-cap exceeded | total PDF pages > 600 (1M context) or > 100 (200K context) | Anthropic verbatim |
+| Aggregate request size approaching cap | total attachment bytes > 30 MB | 2 MB margin under the 32 MB hard cap for prompt body and JSON overhead |
+| Aggregate request size exceeds cap | total attachment bytes > 32 MB | Anthropic hard cap |
+| Context-window overrun | projected (history + draft + attachments high) >= 90 % of context window | Anthropic explicit caveat: "Dense PDFs can fill the context window before reaching the page limit" |
+| Session projection over 90 % | currentSessionPct + estimatedSessionPct (low) >= 90 % | Existing pre-submit warning |
+
+Coaching copy mirrors Anthropic's own published advice: "Try splitting the
+document into sections; for large files, since each page is processed as an
+image, downsampling embedded images can also help."
 
 ## Empirical calibration (Wave-2)
 

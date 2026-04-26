@@ -168,6 +168,10 @@ describe('draft estimate', () => {
         attachmentWarnings: [],
         hasUnknownImage: false,
         hasPdf: false,
+        projectedContextPctLow: 0.01,
+        projectedContextPctHigh: 0.01,
+        contextWindowSize: 1_000_000,
+        contextOverrunWarning: null,
     };
 
     test('applyDraftEstimate sets estimate', () => {

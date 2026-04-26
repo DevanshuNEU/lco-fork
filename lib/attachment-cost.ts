@@ -26,13 +26,13 @@ import { isKnownModel, getContextWindowSize } from './pricing';
 // ── Public types ─────────────────────────────────────────────────────────────
 
 export type AttachmentDescriptor =
-    | { kind: 'image'; width: number; height: number; sourceLabel: string }
+    | { kind: 'image'; width: number; height: number; sourceLabel: string; fileSize: number }
     /**
      * pageCount is null when local parsing failed (encrypted, fully-compressed
      * page tree, malformed). The agent emits an unknown-cost breakdown row in
      * that case so the user still sees the file is tracked.
      */
-    | { kind: 'pdf'; pageCount: number | null; sourceLabel: string };
+    | { kind: 'pdf'; pageCount: number | null; sourceLabel: string; fileSize: number };
 
 /** One row in the per-attachment overlay breakdown. */
 export interface AttachmentBreakdownItem {
@@ -96,6 +96,14 @@ export const PDF_TOKENS_PER_PAGE_HIGH = 3000;
 /** PDF page caps per Anthropic's PDF docs ("Maximum pages per request"). */
 const PDF_PAGE_LIMIT_200K = 100;
 const PDF_PAGE_LIMIT_1M = 600;
+
+/**
+ * Total request size cap from Anthropic's "Maximum request size: 32 MB".
+ * We warn at REQUEST_SIZE_WARN_BYTES (30 MB) so the user has 2 MB of margin
+ * for the prompt body and JSON overhead before the request is rejected.
+ */
+const REQUEST_SIZE_HARD_BYTES = 32 * 1024 * 1024;
+const REQUEST_SIZE_WARN_BYTES = 30 * 1024 * 1024;
 
 /**
  * 200K-context models cap at 100 pages, larger-context models at 600. We read
@@ -219,8 +227,18 @@ export function computeAttachmentCost(
     if (pdfPageTotal > 0) {
         const cap = pdfPageLimit(model);
         if (pdfPageTotal > cap) {
-            warnings.push(`${pdfPageTotal} PDF pages exceeds the ${cap}-page limit on this model.`);
+            warnings.push(`${pdfPageTotal} PDF pages exceeds the ${cap}-page limit on this model. Split into sections.`);
         }
+    }
+
+    // Aggregate file-size warning. Anthropic's request cap is 32 MB; we warn
+    // at 30 MB so users have margin for the rest of the request body.
+    let totalBytes = 0;
+    for (const att of attachments) totalBytes += att.fileSize;
+    if (totalBytes > REQUEST_SIZE_WARN_BYTES) {
+        const mb = (totalBytes / (1024 * 1024)).toFixed(1);
+        const status = totalBytes > REQUEST_SIZE_HARD_BYTES ? 'exceeds' : 'is approaching';
+        warnings.push(`Attachments total ${mb} MB; ${status} Anthropic's 32 MB request limit. Send fewer or smaller files.`);
     }
 
     return {

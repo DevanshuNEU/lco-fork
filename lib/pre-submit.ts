@@ -47,6 +47,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { classifyModelTier } from './prompt-analysis';
+import { getContextWindowSize } from './pricing';
 import type { AttachmentBreakdownItem } from './attachment-cost';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -77,6 +78,13 @@ export interface PreSubmitInput {
     hasUnknownImage?: boolean;
     /** True when at least one PDF is included; surfaces the per-page-image disclosure. */
     hasPdf?: boolean;
+    /**
+     * Current conversation context window utilization (0-100), as already
+     * consumed by message history. The pre-submit estimate adds the projected
+     * tokens for this turn on top to compute the projected context fill.
+     * Default 0; the orchestrator passes state.contextPct.
+     */
+    currentContextPct?: number;
 }
 
 /** One row in the model comparison table. */
@@ -122,6 +130,23 @@ export interface PreSubmitEstimate {
     hasUnknownImage: boolean;
     /** Pass-through: at least one PDF; UI shows "may cost more with charts" disclosure. */
     hasPdf: boolean;
+    /**
+     * Projected context-window utilization after sending this turn (low end).
+     * currentContextPct + (estimatedTokens / contextWindowSize) * 100.
+     * Null when the model has no known context window.
+     */
+    projectedContextPctLow: number | null;
+    /** Projected context utilization at the upper bound (PDF range high end). */
+    projectedContextPctHigh: number | null;
+    /** Context window size in tokens for the model. */
+    contextWindowSize: number;
+    /**
+     * Hard warning when the projection exceeds OVERRUN_ZONE_PCT of the context
+     * window. Anthropic's own guidance: dense PDFs can fill the context window
+     * before the page limit; this surfaces that risk before the user hits send.
+     * Null when the projection is comfortable.
+     */
+    contextOverrunWarning: string | null;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -143,6 +168,15 @@ export const MODEL_COMPARE_THRESHOLD_PCT = 5;
  * At 90%+, the user should know they are about to hit the session limit.
  */
 export const WARNING_ZONE_PCT = 90;
+
+/**
+ * Context-window overrun threshold. Anthropic's PDF docs state: "Dense PDFs
+ * can fill the context window before reaching the page limit." We warn when
+ * the projected total context fill (history + this turn) exceeds 90 percent
+ * so the user can split, downsample, or switch to a larger-context model
+ * before the request gets truncated.
+ */
+export const CONTEXT_OVERRUN_ZONE_PCT = 90;
 
 // ── Main export ──────────────────────────────────────────────────────────────
 
@@ -227,6 +261,31 @@ export function computePreSubmitEstimate(input: PreSubmitInput): PreSubmitEstima
         warning = `Sending this will push your session to ~${Math.round(projectedTotalPct)}%. Consider starting fresh or switching models.`;
     }
 
+    // Context-window projection. The conversation history already consumes
+    // currentContextPct of the model's context window; the new turn adds
+    // textTokens + attachmentTokens on top. We expose both bounds so the UI
+    // can show a range when a PDF is attached.
+    const currentContextPct = input.currentContextPct ?? 0;
+    const contextWindowSize = getContextWindowSize(model);
+    let projectedContextPctLow: number | null = null;
+    let projectedContextPctHigh: number | null = null;
+    let contextOverrunWarning: string | null = null;
+    if (contextWindowSize > 0) {
+        projectedContextPctLow = currentContextPct + (estimatedTokens / contextWindowSize) * 100;
+        projectedContextPctHigh = currentContextPct + (estimatedTokensHigh / contextWindowSize) * 100;
+
+        // Use the HIGH projection so dense PDFs trigger the warning even when
+        // the LOW range fits. This mirrors Anthropic's own caveat: "Dense PDFs
+        // can fill the context window before reaching the page limit."
+        if (projectedContextPctHigh >= CONTEXT_OVERRUN_ZONE_PCT) {
+            const ctxK = Math.round(contextWindowSize / 1000);
+            const pctRounded = Math.round(projectedContextPctHigh);
+            contextOverrunWarning = projectedContextPctHigh >= 100
+                ? `This turn likely exceeds the ${ctxK}k context window (~${pctRounded}%). Split the document or use a larger-context model.`
+                : `This turn would fill ~${pctRounded}% of the ${ctxK}k context window. Consider splitting the document.`;
+        }
+    }
+
     return {
         estimatedTokens,
         estimatedTokensHigh,
@@ -240,5 +299,9 @@ export function computePreSubmitEstimate(input: PreSubmitInput): PreSubmitEstima
         attachmentWarnings,
         hasUnknownImage,
         hasPdf,
+        projectedContextPctLow,
+        projectedContextPctHigh,
+        contextWindowSize,
+        contextOverrunWarning,
     };
 }

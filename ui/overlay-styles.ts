@@ -218,6 +218,15 @@ export const OVERLAY_CSS = `
   text-overflow: ellipsis;
 }
 
+.lco-draft-context {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--lco-text);
+  font-variant-numeric: tabular-nums;
+  margin-top: 1px;
+  opacity: 0.85;
+}
+
 .lco-draft-breakdown {
   font-size: 9px;
   line-height: 1.4;
