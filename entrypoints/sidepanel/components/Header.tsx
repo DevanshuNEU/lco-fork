@@ -81,26 +81,35 @@ function SaarSigil(): React.ReactElement {
 }
 
 /**
- * 16px gear glyph. Uses currentColor so it picks up muted text by default
- * and accent on hover (rules in dashboard.css).
+ * 18px gear glyph. Crisper outline than the typical 16px Material gear,
+ * sits at a comfortable size against the 24px Saar wordmark. Uses
+ * currentColor so it picks up muted text by default and accent on hover
+ * (rules in dashboard.css).
  */
 function GearIcon(): React.ReactElement {
     return (
         <svg
-            width={16}
-            height={16}
-            viewBox="0 0 16 16"
+            width={18}
+            height={18}
+            viewBox="0 0 24 24"
             xmlns="http://www.w3.org/2000/svg"
             aria-hidden="true"
         >
             <path
-                fill="currentColor"
-                d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Zm0 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5Z"
             />
             <path
-                fill="currentColor"
-                d="M9.05 1.5a.75.75 0 0 1 .74.62l.18 1.04a5.5 5.5 0 0 1 1.16.67l.99-.38a.75.75 0 0 1 .9.32l1.05 1.82a.75.75 0 0 1-.16.95l-.81.69c.05.38.05.77 0 1.16l.81.69a.75.75 0 0 1 .16.95l-1.05 1.82a.75.75 0 0 1-.9.32l-.99-.38a5.5 5.5 0 0 1-1.16.67l-.18 1.04a.75.75 0 0 1-.74.62H6.95a.75.75 0 0 1-.74-.62l-.18-1.04a5.5 5.5 0 0 1-1.16-.67l-.99.38a.75.75 0 0 1-.9-.32L1.93 9.06a.75.75 0 0 1 .16-.95l.81-.69a5.6 5.6 0 0 1 0-1.16l-.81-.69a.75.75 0 0 1-.16-.95l1.05-1.82a.75.75 0 0 1 .9-.32l.99.38a5.5 5.5 0 0 1 1.16-.67l.18-1.04a.75.75 0 0 1 .74-.62h2.1Z"
-                opacity="0.9"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.75"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
             />
         </svg>
     );
