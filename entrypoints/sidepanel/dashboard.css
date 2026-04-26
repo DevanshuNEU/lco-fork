@@ -58,11 +58,66 @@
     --lco-context-fill: var(--lco-terracotta);
     --lco-context-track: rgba(28, 26, 24, 0.10);
 
-    --lco-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --lco-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    /* Three font roles. We ship system fallbacks only for now; the actual
+       Fraunces / IBM Plex faces are loaded in a follow-up issue (GET-32) so
+       this PR doesn't pull in webfont weight. The cascade is in place: drop
+       the Fraunces and Plex woff2 files into public/fonts/ later, register
+       them with @font-face, and the hierarchy here picks them up unchanged. */
+    --lco-font-display: 'Fraunces', 'Newsreader', Georgia, 'Times New Roman', serif;
+    --lco-font:         'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --lco-font-mono:    'IBM Plex Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
     --lco-radius: 8px;
     --lco-radius-sm: 4px;
     --lco-transition: 200ms ease;
+}
+
+/* ── Typography utility classes ────────────────────────────────────────────
+   Four roles map onto every metric in the panel. Size jumps are 3x+ from
+   .lco-micro to .lco-hero so the eye lands on hero numbers first, then
+   reads supporting data, then labels. */
+
+.lco-hero {
+    font-family: var(--lco-font-display);
+    font-weight: 200;        /* extreme light: editorial, instrument-like */
+    font-size: 40px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    color: var(--lco-text);
+    font-variant-numeric: tabular-nums;
+}
+.lco-hero sup {
+    font-size: 0.42em;
+    font-weight: 400;
+    vertical-align: 0.55em;
+    margin-left: 0.08em;
+    color: var(--lco-text-secondary);
+    letter-spacing: 0;
+}
+
+.lco-section {
+    font-family: var(--lco-font-display);
+    font-style: italic;       /* lowercase italic carries the "essay" voice */
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--lco-text);
+}
+
+.lco-label {
+    font-family: var(--lco-font-mono);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--lco-text-muted);
+}
+
+.lco-data {
+    font-family: var(--lco-font-mono);
+    font-size: 11px;
+    color: var(--lco-text-secondary);
+    font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -78,6 +133,47 @@
         --lco-accent-light: rgba(193, 95, 60, 0.15);
         --lco-context-track: rgba(245, 241, 234, 0.12);
     }
+}
+
+/* ── Explicit theme overrides ──────────────────────────────────────────────
+   data-theme on the documentElement beats prefers-color-scheme. The settings
+   drawer (see useSettings.ts) sets one of: 'system' (no override; falls
+   through to the media query above), 'dawn' (light), 'dusk' (standard dark),
+   'void' (true OLED black with slate cards for amoled-friendly viewing). */
+
+:root[data-theme='dawn'] {
+    --lco-bg: var(--lco-bone);
+    --lco-bg-card: var(--lco-linen);
+    --lco-bg-hover: #ddd5c8;
+    --lco-text: var(--lco-charcoal);
+    --lco-text-secondary: #6b6660;
+    --lco-text-muted: var(--lco-ash);
+    --lco-border: rgba(28, 26, 24, 0.10);
+    --lco-context-track: rgba(28, 26, 24, 0.10);
+}
+
+:root[data-theme='dusk'] {
+    --lco-bg: var(--lco-charcoal);
+    --lco-bg-card: var(--lco-slate);
+    --lco-bg-hover: #34322e;
+    --lco-text: var(--lco-bone);
+    --lco-text-secondary: #b8b1a4;
+    --lco-text-muted: var(--lco-ash);
+    --lco-border: rgba(245, 241, 234, 0.12);
+    --lco-context-track: rgba(245, 241, 234, 0.12);
+}
+
+:root[data-theme='void'] {
+    /* True black for OLED panels. Cards stay slate so contrast against the
+       page is preserved instead of cards disappearing into the page bg. */
+    --lco-bg: #000000;
+    --lco-bg-card: var(--lco-slate);
+    --lco-bg-hover: #1a1816;
+    --lco-text: var(--lco-bone);
+    --lco-text-secondary: #b8b1a4;
+    --lco-text-muted: var(--lco-ash);
+    --lco-border: rgba(245, 241, 234, 0.10);
+    --lco-context-track: rgba(245, 241, 234, 0.10);
 }
 
 * {
@@ -147,17 +243,24 @@ body {
     flex-shrink: 0;
 }
 
+/* Title in the display face at a real size jump from the subtitle below.
+   Letterspacing comes in slightly tighter than default to feel set, not typed. */
 .lco-dash-title {
-    font-size: 18px;
+    font-family: var(--lco-font-display);
+    font-size: 24px;
     font-weight: 700;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
     color: var(--lco-text);
+    line-height: 1.05;
 }
 
 .lco-dash-subtitle {
-    font-size: 11px;
+    font-family: var(--lco-font-mono);
+    font-size: 9px;
     color: var(--lco-text-muted);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 2px;
 }
 
 /* ── Collapsible sections ───────────────────────────────────────────────────── */
@@ -175,12 +278,15 @@ body {
     background: none;
     border: none;
     cursor: pointer;
-    font-family: var(--lco-font);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--lco-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    /* Lowercase italic display face: editorial voice rather than a corporate
+       uppercase letterspaced tag. Pairs with the chevron affordance. */
+    font-family: var(--lco-font-display);
+    font-style: italic;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--lco-text);
+    text-transform: lowercase;
+    letter-spacing: 0;
     border-radius: var(--lco-radius-sm);
     transition: background var(--lco-transition);
 }
@@ -328,18 +434,28 @@ body {
 .lco-dash-health-dot--degrading { background: var(--lco-brass);  box-shadow: 0 0 4px rgba(176, 136, 88, 0.4); }
 .lco-dash-health-dot--critical  { background: var(--lco-rust);   animation: lco-dot-pulse 2s ease-in-out infinite; }
 
+/* Health label sits with the dot. Mono uppercase gives it a status-bar feel:
+   a verdict, not a sentence. */
 .lco-dash-health-label {
+    font-family: var(--lco-font-mono);
     font-size: 10px;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
     color: var(--lco-text-secondary);
 }
 
+/* Subject reads as the chapter title of the active conversation. Display
+   italic gives it editorial weight without shouting; size bumps from 12px
+   to 14px so it anchors the card. */
 .lco-dash-active-subject {
-    font-size: 12px;
-    font-weight: 500;
+    font-family: var(--lco-font-display);
+    font-style: italic;
+    font-weight: 400;
+    font-size: 14px;
     color: var(--lco-text);
     margin-bottom: 10px;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .lco-dash-context-bar-container {
@@ -445,18 +561,26 @@ body {
 .lco-dash-budget-dot--critical    { background: var(--lco-rust);   box-shadow: 0 0 4px rgba(142, 61, 42, 0.4); }
 
 .lco-dash-budget-zone-label {
+    font-family: var(--lco-font-mono);
     font-size: 10px;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
     color: var(--lco-text-secondary);
 }
 
-/* Primary status line: "11% used; resets in 53 min" */
+/* Primary status line: "11% used; resets in 53 min" / "$83.77 of $300 spent".
+   Bumped to display face at 15px so the dollar / percentage figure reads as
+   the headline of the card without needing a separate hero markup. */
 .lco-dash-budget-status {
-    font-size: 11px;
-    font-weight: 500;
+    font-family: var(--lco-font-display);
+    font-weight: 400;
+    font-size: 15px;
     color: var(--lco-text);
-    margin-bottom: 10px;
-    line-height: 1.4;
+    margin-bottom: 12px;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
 }
 
 /* Session and weekly bar rows */
