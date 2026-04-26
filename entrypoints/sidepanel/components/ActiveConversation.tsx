@@ -7,6 +7,7 @@ import type { ConversationRecord } from '../../../lib/conversation-store';
 import type { HealthScore } from '../../../lib/health-score';
 import type { UsageBudgetResult } from '../../../lib/message-types';
 import { formatTokens, formatApiRateCost } from '../../../lib/format';
+import { getContextWindowSize } from '../../../lib/pricing';
 import TurnTicker from './TurnTicker';
 
 interface Props {
@@ -52,8 +53,18 @@ export default function ActiveConversation({ conv, health, budget }: Props) {
     }
 
     const subject = conv.dna?.subject || 'New conversation';
-    const rawPct = conv.lastContextPct;
-    const safePct = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
+
+    // Compute context % from cumulative tokens, not the stored
+    // record.lastContextPct field. The overlay does the same thing for the
+    // same reason (see lib/overlay-state.ts:applyRestoredConversation): some
+    // older records were written with lastContextPct in fractional units
+    // (0.026 instead of 2.6), which renders as a flat zero bar. Tokens are
+    // always correct, so we recompute against the model's window each time.
+    const ctxWindow = getContextWindowSize(conv.model) || 200000;
+    const usedTokens = conv.totalInputTokens + conv.totalOutputTokens;
+    const computedPct = ctxWindow > 0 ? (usedTokens / ctxWindow) * 100 : 0;
+    const safePct = Number.isFinite(computedPct) ? Math.min(Math.max(computedPct, 0), 100) : 0;
+
     const healthLevel = health?.level ?? 'healthy';
     const healthLabel = health?.label ?? 'Healthy';
 
