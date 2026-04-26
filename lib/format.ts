@@ -2,6 +2,8 @@
 // Pure formatting utilities shared across overlay, dashboard, and handoff-summary.
 // No DOM refs, no chrome.* APIs.
 
+import type { UsageBudgetResult } from './message-types';
+
 /**
  * Format token count for compact display.
  * 1234 -> "1.2k", 1234567 -> "1.2M", 500 -> "500"
@@ -31,6 +33,38 @@ export function formatCost(cost: number | null, decimals: number = 2): string {
         return `$${cost.toFixed(4)}`;
     }
     return `$${cost.toFixed(decimals)}`;
+}
+
+/**
+ * Tier-aware cost formatter. On flat-rate plans (Pro / Max / Free, all of
+ * which dispatch to the `session` budget variant) Anthropic does not bill
+ * the user per token; the dollar figure we display is the API-equivalent
+ * cost, useful as a relative anchor but technically not a charge.
+ *
+ * Earlier draft suffixed these readings with "API rate"; first-look feedback
+ * was that the label competed with the figure and read as jargon. The "≈"
+ * symbol carries the same meaning more quietly: the value is approximate
+ * because it is computed from API rates, not billed against the user's plan.
+ *
+ * On credit accounts (Enterprise) the dollar figure is real spend against
+ * the monthly pool, so we render it plain. Pass `null` for budget when the
+ * tier is genuinely unknown (no usage endpoint reading yet); we
+ * conservatively label it as approximate.
+ *
+ * @param cost    cost in dollars, or null for unknown-model fallback
+ * @param budget  current usage budget result (or its `kind` discriminator)
+ * @param decimals decimal precision (default 2; auto-promotes to 4 on micro amounts)
+ */
+export function formatApiRateCost(
+    cost: number | null,
+    budget: UsageBudgetResult | { kind: UsageBudgetResult['kind'] } | null,
+    decimals: number = 2,
+): string {
+    const base = formatCost(cost, decimals);
+    if (cost === null) return base;            // already reads as "$0.00*"
+    const kind = budget?.kind ?? null;
+    if (kind === 'credit') return base;        // Enterprise pays per token; figure is real
+    return `≈${base}`;                         // session, unsupported, or unknown
 }
 
 /**

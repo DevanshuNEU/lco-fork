@@ -2,44 +2,178 @@
    Side panel dashboard styles. Uses CSS custom properties for theming.
    Claude-aligned: warm terra cotta accent, Pampas palette, minimal. */
 
-/* ── Reset & Variables ──────────────────────────────────────────────────────── */
-
+/* ── Brand palette (workshop tokens) ─────────────────────────────────────────
+   Two-layer color system. The brand layer below uses semantic names so the
+   CSS reads like a hardware-store paint receipt; the surface layer further
+   down maps those into bg / text / border roles per theme. Replacing a
+   palette token here propagates through every component without grepping
+   for hex codes. */
 :root {
-    --lco-bg: #ffffff;
-    --lco-bg-card: #f8f7f5;
-    --lco-bg-hover: #f0efed;
-    --lco-text: #1a1a1a;
-    --lco-text-secondary: #6b6b6b;
-    --lco-text-muted: #a0a0a0;
-    --lco-border: #e5e3df;
-    --lco-accent: #c15f3c;
+    /* Accent: terra cotta is the only signature color. Sienna is its hover. */
+    --lco-terracotta:   #c15f3c;
+    --lco-sienna:       #a84f2f;
+
+    /* Health zones: workshop earth tones replacing 2014-era Material colors.
+       Patina (operational), brass (moderate), ember (tight), rust (critical).
+       Verified against WCAG AA when used as 8px+ graphic shapes; not used as
+       body text on either surface. */
+    --lco-patina:       #5a7a5e;
+    --lco-brass:        #b08858;
+    --lco-ember:        #cc6b3d;
+    --lco-rust:         #8e3d2a;
+
+    /* Surfaces. Bone and linen are light; charcoal and slate are dark.
+       No pure white, no pure black: the eye reads warmth at low contrast
+       far longer than it tolerates clinical FFFFFF. Ash is the muted-text
+       neutral that sits between body text and background on either side. */
+    --lco-bone:         #f5f1ea;
+    --lco-linen:        #e8e2d4;
+    --lco-charcoal:     #1c1a18;
+    --lco-slate:        #2a2825;
+    --lco-ash:          #8b857c;
+}
+
+/* ── Surface tokens (mapped from palette) ───────────────────────────────────
+   These are the names component CSS reaches for. Light defaults below;
+   prefers-color-scheme: dark and explicit data-theme overrides below that. */
+:root {
+    --lco-bg: var(--lco-bone);
+    --lco-bg-card: var(--lco-linen);
+    --lco-bg-hover: #ddd5c8;
+    --lco-text: var(--lco-charcoal);
+    --lco-text-secondary: #6b6660;
+    --lco-text-muted: var(--lco-ash);
+    --lco-border: rgba(28, 26, 24, 0.10);
+
+    --lco-accent: var(--lco-terracotta);
     --lco-accent-light: rgba(193, 95, 60, 0.10);
-    --lco-health-green: #4caf50;
-    --lco-health-yellow: #f5a623;
-    --lco-health-orange: #ff9800;
-    --lco-health-red: #e53935;
-    --lco-context-fill: #c15f3c;
-    --lco-context-track: #e5e3df;
-    --lco-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --lco-font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+    /* Health tokens kept as legacy names so existing components keep working
+       through this commit; future work points at the workshop names directly. */
+    --lco-health-green:  var(--lco-patina);
+    --lco-health-yellow: var(--lco-brass);
+    --lco-health-orange: var(--lco-ember);
+    --lco-health-red:    var(--lco-rust);
+
+    --lco-context-fill: var(--lco-terracotta);
+    --lco-context-track: rgba(28, 26, 24, 0.10);
+
+    /* Three font roles. We ship system fallbacks only for now; the actual
+       Fraunces / IBM Plex faces are loaded in a follow-up issue (GET-32) so
+       this PR doesn't pull in webfont weight. The cascade is in place: drop
+       the Fraunces and Plex woff2 files into public/fonts/ later, register
+       them with @font-face, and the hierarchy here picks them up unchanged. */
+    --lco-font-display: 'Fraunces', 'Newsreader', Georgia, 'Times New Roman', serif;
+    --lco-font:         'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --lco-font-mono:    'IBM Plex Mono', 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
     --lco-radius: 8px;
     --lco-radius-sm: 4px;
     --lco-transition: 200ms ease;
 }
 
+/* ── Typography utility classes ────────────────────────────────────────────
+   Four roles map onto every metric in the panel. Size jumps are 3x+ from
+   .lco-micro to .lco-hero so the eye lands on hero numbers first, then
+   reads supporting data, then labels. */
+
+.lco-hero {
+    font-family: var(--lco-font-display);
+    font-weight: 200;        /* extreme light: editorial, instrument-like */
+    font-size: 40px;
+    letter-spacing: -0.03em;
+    line-height: 0.95;
+    color: var(--lco-text);
+    font-variant-numeric: tabular-nums;
+}
+.lco-hero sup {
+    font-size: 0.42em;
+    font-weight: 400;
+    vertical-align: 0.55em;
+    margin-left: 0.08em;
+    color: var(--lco-text-secondary);
+    letter-spacing: 0;
+}
+
+.lco-section {
+    font-family: var(--lco-font-display);
+    font-style: italic;       /* lowercase italic carries the "essay" voice */
+    font-weight: 400;
+    font-size: 14px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--lco-text);
+}
+
+.lco-label {
+    font-family: var(--lco-font-mono);
+    font-weight: 500;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--lco-text-muted);
+}
+
+.lco-data {
+    font-family: var(--lco-font-mono);
+    font-size: 11px;
+    color: var(--lco-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-color-scheme: dark) {
     :root {
-        --lco-bg: #1a1a1a;
-        --lco-bg-card: #242424;
-        --lco-bg-hover: #2e2e2e;
-        --lco-text: #e8e6e3;
-        --lco-text-secondary: #a0a0a0;
-        --lco-text-muted: #6b6b6b;
-        --lco-border: #333333;
-        --lco-accent: #c15f3c;
+        --lco-bg: var(--lco-charcoal);
+        --lco-bg-card: var(--lco-slate);
+        --lco-bg-hover: #34322e;
+        --lco-text: var(--lco-bone);
+        --lco-text-secondary: #b8b1a4;
+        --lco-text-muted: var(--lco-ash);
+        --lco-border: rgba(245, 241, 234, 0.12);
+        --lco-accent: var(--lco-terracotta);
         --lco-accent-light: rgba(193, 95, 60, 0.15);
-        --lco-context-track: #333333;
+        --lco-context-track: rgba(245, 241, 234, 0.12);
     }
+}
+
+/* ── Explicit theme overrides ──────────────────────────────────────────────
+   data-theme on the documentElement beats prefers-color-scheme. The settings
+   drawer (see useSettings.ts) sets one of: 'system' (no override; falls
+   through to the media query above), 'dawn' (light), 'dusk' (standard dark),
+   'void' (true OLED black with slate cards for amoled-friendly viewing). */
+
+:root[data-theme='dawn'] {
+    --lco-bg: var(--lco-bone);
+    --lco-bg-card: var(--lco-linen);
+    --lco-bg-hover: #ddd5c8;
+    --lco-text: var(--lco-charcoal);
+    --lco-text-secondary: #6b6660;
+    --lco-text-muted: var(--lco-ash);
+    --lco-border: rgba(28, 26, 24, 0.10);
+    --lco-context-track: rgba(28, 26, 24, 0.10);
+}
+
+:root[data-theme='dusk'] {
+    --lco-bg: var(--lco-charcoal);
+    --lco-bg-card: var(--lco-slate);
+    --lco-bg-hover: #34322e;
+    --lco-text: var(--lco-bone);
+    --lco-text-secondary: #b8b1a4;
+    --lco-text-muted: var(--lco-ash);
+    --lco-border: rgba(245, 241, 234, 0.12);
+    --lco-context-track: rgba(245, 241, 234, 0.12);
+}
+
+:root[data-theme='void'] {
+    /* True black for OLED panels. Cards stay slate so contrast against the
+       page is preserved instead of cards disappearing into the page bg. */
+    --lco-bg: #000000;
+    --lco-bg-card: var(--lco-slate);
+    --lco-bg-hover: #1a1816;
+    --lco-text: var(--lco-bone);
+    --lco-text-secondary: #b8b1a4;
+    --lco-text-muted: var(--lco-ash);
+    --lco-border: rgba(245, 241, 234, 0.10);
+    --lco-context-track: rgba(245, 241, 234, 0.10);
 }
 
 * {
@@ -101,25 +235,60 @@ body {
     margin-bottom: 12px;
 }
 
-.lco-dash-logo {
-    width: 36px;
-    height: 36px;
-    border-radius: var(--lco-radius);
-    border: 2px dashed var(--lco-border);
-    flex-shrink: 0;
+/* Title block grows to fill the row so the gear stays right-aligned. */
+.lco-dash-header-text {
+    flex: 1;
+    min-width: 0;
 }
 
+/* Settings trigger. Quiet by default (muted icon), warms to terra cotta
+   on hover. Keyboard focus gets the same ring used elsewhere on the panel. */
+.lco-dash-header-gear {
+    background: none;
+    border: none;
+    padding: 6px;
+    cursor: pointer;
+    color: var(--lco-text-muted);
+    border-radius: var(--lco-radius-sm);
+    transition: color var(--lco-transition), background var(--lco-transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.lco-dash-header-gear:hover {
+    color: var(--lco-accent);
+    background: var(--lco-bg-hover);
+}
+.lco-dash-header-gear:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+
+/* Wordmark placeholder until the custom letterform lands. Thin geometric
+   sans at wide tracking gestures toward the eventual logo direction (the
+   AA-merger concept) without committing to it. We use a system-geometric
+   stack so nothing has to download; SF Pro Display on macOS, Inter on
+   anything that has it, system-ui as the floor. Weight 300 reads light
+   enough to feel architectural without dropping into hairline territory
+   that would smear at 96dpi. */
 .lco-dash-title {
-    font-size: 18px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: var(--lco-text);
+    line-height: 1;
 }
 
 .lco-dash-subtitle {
-    font-size: 11px;
+    font-family: var(--lco-font-mono);
+    font-size: 9px;
     color: var(--lco-text-muted);
-    letter-spacing: 0.02em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-top: 2px;
 }
 
 /* ── Collapsible sections ───────────────────────────────────────────────────── */
@@ -137,12 +306,15 @@ body {
     background: none;
     border: none;
     cursor: pointer;
-    font-family: var(--lco-font);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--lco-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    /* Lowercase italic display face: editorial voice rather than a corporate
+       uppercase letterspaced tag. Pairs with the chevron affordance. */
+    font-family: var(--lco-font-display);
+    font-style: italic;
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--lco-text);
+    text-transform: lowercase;
+    letter-spacing: 0;
     border-radius: var(--lco-radius-sm);
     transition: background var(--lco-transition);
 }
@@ -284,19 +456,33 @@ body {
     /* No transition: health state changes snap instantly (rare, not per-frame). */
 }
 
-.lco-dash-health-dot--healthy   { background: var(--lco-health-green); box-shadow: 0 0 4px rgba(76, 175, 80, 0.4); }
-.lco-dash-health-dot--degrading { background: var(--lco-health-yellow); box-shadow: 0 0 4px rgba(245, 166, 35, 0.4); }
-.lco-dash-health-dot--critical  { background: var(--lco-health-red); animation: lco-dot-pulse 2s ease-in-out infinite; }
+/* Workshop palette: warm earth tones glow ~40% alpha to match the dot fill.
+   Critical pulses on its own (see lco-dot-pulse keyframes below). */
+.lco-dash-health-dot--healthy   { background: var(--lco-patina); box-shadow: 0 0 4px rgba(90, 122, 94, 0.4); }
+.lco-dash-health-dot--degrading { background: var(--lco-brass);  box-shadow: 0 0 4px rgba(176, 136, 88, 0.4); }
+.lco-dash-health-dot--critical  { background: var(--lco-rust);   animation: lco-dot-pulse 2s ease-in-out infinite; }
 
+/* Health label sits with the dot. Mono uppercase gives it a status-bar feel:
+   a verdict, not a sentence. */
 .lco-dash-health-label {
+    font-family: var(--lco-font-mono);
     font-size: 10px;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
     color: var(--lco-text-secondary);
 }
 
+/* Subject sits as a regular sans line, not display italic. Earlier draft
+   used italic display here; in real use it competed with the budget hero
+   ($X of $Y) and the section heads, all set in the same italic display
+   face. The eye lost its anchor. Sans medium reads as the conversation's
+   working title without claiming hero weight that belongs to the dollar
+   figure. Size held at 13px so it still anchors the card body. */
 .lco-dash-active-subject {
-    font-size: 12px;
+    font-family: var(--lco-font);
     font-weight: 500;
+    font-size: 13px;
     color: var(--lco-text);
     margin-bottom: 10px;
     line-height: 1.4;
@@ -328,9 +514,9 @@ body {
     transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.lco-dash-context-fill--healthy   { background: var(--lco-health-green); box-shadow: 0 0 4px rgba(76, 175, 80, 0.3); }
-.lco-dash-context-fill--degrading { background: var(--lco-health-yellow); box-shadow: 0 0 4px rgba(245, 166, 35, 0.3); }
-.lco-dash-context-fill--critical  { background: var(--lco-health-red); box-shadow: 0 0 4px rgba(229, 57, 53, 0.3); }
+.lco-dash-context-fill--healthy   { background: var(--lco-patina); box-shadow: 0 0 4px rgba(90, 122, 94, 0.3); }
+.lco-dash-context-fill--degrading { background: var(--lco-brass);  box-shadow: 0 0 4px rgba(176, 136, 88, 0.3); }
+.lco-dash-context-fill--critical  { background: var(--lco-rust);   box-shadow: 0 0 4px rgba(142, 61, 42, 0.3); }
 
 .lco-dash-context-label {
     font-size: 11px;
@@ -344,6 +530,66 @@ body {
     font-size: 11px;
     color: var(--lco-text-secondary);
     font-variant-numeric: tabular-nums;
+}
+
+/* ── Per-turn ticker ────────────────────────────────────────────────────────
+   Vertical bars, one per recorded turn. Height encodes session %; color is
+   a single terra cotta tint for now (zone coloring lands with GET-28). The
+   visualization makes context rot legible: bars climb as the conversation
+   grows because each turn pulls in more history.
+
+   Sits between the context bar and the stats line so the eye reads:
+     verdict -> subject -> %context -> per-turn shape -> totals
+   in a top-to-bottom decay from coarsest to finest. */
+.lco-ticker {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    height: 36px;
+    margin: 6px 0 10px;
+}
+
+.lco-ticker-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    flex: 1;
+    height: 100%;
+}
+
+.lco-ticker-bar {
+    flex: 1;
+    min-width: 4px;
+    min-height: 2px;
+    background: var(--lco-accent);
+    border-radius: 1px;
+    /* Height transition is GPU-friendly enough at 12 elements; we still
+       gate it behind reduced-motion for users who prefer instant updates. */
+    transition: height 360ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: height;
+    cursor: default;
+}
+
+.lco-ticker-bar:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 1px;
+    border-radius: 1px;
+}
+
+.lco-ticker-trend {
+    font-family: var(--lco-font-mono);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+    color: var(--lco-text-muted);
+    align-self: flex-start;
+    padding-top: 2px;
+    flex-shrink: 0;
+}
+.lco-ticker-trend--up   { color: var(--lco-ember); }
+.lco-ticker-trend--down { color: var(--lco-patina); }
+
+@media (prefers-reduced-motion: reduce) {
+    .lco-ticker-bar { transition: none; }
 }
 
 /* Dot separators between stat spans; avoids hardcoding · in JSX. */
@@ -399,24 +645,33 @@ body {
     flex-shrink: 0;
 }
 
-.lco-dash-budget-dot--comfortable { background: var(--lco-health-green);  box-shadow: 0 0 4px rgba(76, 175, 80, 0.4); }
-.lco-dash-budget-dot--moderate    { background: var(--lco-health-yellow); box-shadow: 0 0 4px rgba(245, 166, 35, 0.4); }
-.lco-dash-budget-dot--tight       { background: var(--lco-health-orange); box-shadow: 0 0 4px rgba(255, 152, 0, 0.4); }
-.lco-dash-budget-dot--critical    { background: var(--lco-health-red);    box-shadow: 0 0 4px rgba(229, 57, 53, 0.4); }
+.lco-dash-budget-dot--comfortable { background: var(--lco-patina); box-shadow: 0 0 4px rgba(90, 122, 94, 0.4); }
+.lco-dash-budget-dot--moderate    { background: var(--lco-brass);  box-shadow: 0 0 4px rgba(176, 136, 88, 0.4); }
+.lco-dash-budget-dot--tight       { background: var(--lco-ember);  box-shadow: 0 0 4px rgba(204, 107, 61, 0.4); }
+.lco-dash-budget-dot--critical    { background: var(--lco-rust);   box-shadow: 0 0 4px rgba(142, 61, 42, 0.4); }
 
 .lco-dash-budget-zone-label {
+    font-family: var(--lco-font-mono);
     font-size: 10px;
     font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.10em;
     color: var(--lco-text-secondary);
 }
 
-/* Primary status line: "11% used; resets in 53 min" */
+/* Primary status line: "11% used; resets in 53 min" / "$83.77 of $300 spent".
+   Display face at 17px upright (no italic). This is the only true hero on
+   the card and now stands alone: subject demoted to sans so this line
+   doesn't compete for the eye anymore. */
 .lco-dash-budget-status {
-    font-size: 11px;
-    font-weight: 500;
+    font-family: var(--lco-font-display);
+    font-weight: 400;
+    font-size: 17px;
     color: var(--lco-text);
-    margin-bottom: 10px;
-    line-height: 1.4;
+    margin-bottom: 12px;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+    font-variant-numeric: tabular-nums;
 }
 
 /* Session and weekly bar rows */
@@ -453,10 +708,10 @@ body {
     transition: transform 300ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.lco-dash-budget-fill--comfortable { background: var(--lco-health-green);  box-shadow: 0 0 4px rgba(76, 175, 80, 0.3); }
-.lco-dash-budget-fill--moderate    { background: var(--lco-health-yellow); box-shadow: 0 0 4px rgba(245, 166, 35, 0.3); }
-.lco-dash-budget-fill--tight       { background: var(--lco-health-orange); box-shadow: 0 0 4px rgba(255, 152, 0, 0.3); }
-.lco-dash-budget-fill--critical    { background: var(--lco-health-red);    box-shadow: 0 0 4px rgba(229, 57, 53, 0.3); }
+.lco-dash-budget-fill--comfortable { background: var(--lco-patina); box-shadow: 0 0 4px rgba(90, 122, 94, 0.3); }
+.lco-dash-budget-fill--moderate    { background: var(--lco-brass);  box-shadow: 0 0 4px rgba(176, 136, 88, 0.3); }
+.lco-dash-budget-fill--tight       { background: var(--lco-ember);  box-shadow: 0 0 4px rgba(204, 107, 61, 0.3); }
+.lco-dash-budget-fill--critical    { background: var(--lco-rust);   box-shadow: 0 0 4px rgba(142, 61, 42, 0.3); }
 
 .lco-dash-budget-row-pct {
     font-size: 11px;
@@ -692,8 +947,8 @@ body {
 /* ── Animations ─────────────────────────────────────────────────────────────── */
 
 @keyframes lco-dot-pulse {
-    0%, 100% { box-shadow: 0 0 4px rgba(229, 57, 53, 0.4); }
-    50%      { box-shadow: 0 0 10px rgba(229, 57, 53, 0.7); }
+    0%, 100% { box-shadow: 0 0 4px rgba(142, 61, 42, 0.4); }
+    50%      { box-shadow: 0 0 10px rgba(142, 61, 42, 0.7); }
 }
 
 @keyframes lco-dash-slide-in {
@@ -736,4 +991,224 @@ body {
     .lco-dash-feedback-send {
         transition: none;
     }
+    .lco-settings,
+    .lco-swatch,
+    .lco-density-option {
+        transition: none;
+    }
+}
+
+/* ── Settings drawer ────────────────────────────────────────────────────────
+   Renders as a native <dialog>. The browser owns focus trap, Escape key,
+   and inert-backdrop semantics; we only style the surface. The drawer fills
+   the panel rather than sliding in from the side because the panel is too
+   narrow (320-400px) for a side-slide to feel like a drawer rather than a
+   takeover. */
+
+.lco-settings {
+    width: 100%;
+    max-width: 360px;
+    margin: auto;
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius);
+    background: var(--lco-bg-card);
+    color: var(--lco-text);
+    padding: 0;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.20);
+}
+
+.lco-settings::backdrop {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(2px);
+}
+
+.lco-settings-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--lco-border);
+}
+
+.lco-settings-title {
+    /* Reuses .lco-section styling (lowercase italic display face) so the
+       drawer header reads like every other section heading on the panel. */
+    margin: 0;
+}
+
+.lco-settings-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--lco-text-muted);
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: var(--lco-radius-sm);
+    transition: color var(--lco-transition), background var(--lco-transition);
+}
+.lco-settings-close:hover {
+    color: var(--lco-text);
+    background: var(--lco-bg-hover);
+}
+.lco-settings-close:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+
+.lco-settings-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.lco-settings-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Theme swatches: 2x2 grid. Each swatch shows a color preview, label, and
+   short description. Selected one gets the accent ring. */
+.lco-swatches {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.lco-swatch {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 10px;
+    background: var(--lco-bg);
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color var(--lco-transition), background var(--lco-transition);
+    font-family: var(--lco-font);
+    color: inherit;
+}
+.lco-swatch:hover {
+    background: var(--lco-bg-hover);
+}
+.lco-swatch:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+.lco-swatch--on {
+    border-color: var(--lco-accent);
+    box-shadow: inset 0 0 0 1px var(--lco-accent);
+}
+
+.lco-swatch-preview {
+    width: 100%;
+    height: 28px;
+    border-radius: 3px;
+    border: 1px solid var(--lco-border);
+}
+
+/* Per-theme preview tiles. The system tile uses a half-light, half-dark
+   diagonal so the user can see at a glance that it follows the OS. */
+.lco-swatch-preview--system {
+    background: linear-gradient(135deg, #f5f1ea 0%, #f5f1ea 49%, #1c1a18 51%, #1c1a18 100%);
+}
+.lco-swatch-preview--dawn   { background: #f5f1ea; }
+.lco-swatch-preview--dusk   { background: #1c1a18; }
+.lco-swatch-preview--void   { background: #000000; }
+
+.lco-swatch-label {
+    font-family: var(--lco-font-display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--lco-text);
+}
+
+.lco-swatch-desc {
+    font-family: var(--lco-font-mono);
+    font-size: 9px;
+    color: var(--lco-text-muted);
+    letter-spacing: 0.06em;
+}
+
+/* Density options stack vertically, each with a description. Same selection
+   pattern as theme swatches but laid out as full-width rows. */
+.lco-density-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lco-density-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px;
+    background: var(--lco-bg);
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color var(--lco-transition), background var(--lco-transition);
+    font-family: var(--lco-font);
+    color: inherit;
+}
+.lco-density-option:hover {
+    background: var(--lco-bg-hover);
+}
+.lco-density-option:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+.lco-density-option--on {
+    border-color: var(--lco-accent);
+    box-shadow: inset 0 0 0 1px var(--lco-accent);
+}
+
+.lco-density-label-text {
+    font-family: var(--lco-font-display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--lco-text);
+}
+
+.lco-density-desc {
+    font-family: var(--lco-font-mono);
+    font-size: 9px;
+    color: var(--lco-text-muted);
+    letter-spacing: 0.06em;
+}
+
+/* Compact density variant: tightens vertical rhythm across the panel. The
+   intent is to roughly halve interior gaps for power users who want more
+   info per glance without changing typography. */
+:root[data-density='compact'] .lco-dash {
+    padding: 12px 10px;
+}
+:root[data-density='compact'] .lco-dash-section {
+    margin-bottom: 4px;
+}
+:root[data-density='compact'] .lco-dash-section-inner {
+    padding: 2px 0 4px;
+}
+:root[data-density='compact'] .lco-dash-active {
+    padding: 4px 0;
+}
+:root[data-density='compact'] .lco-dash-active-subject {
+    margin-bottom: 6px;
+}
+:root[data-density='compact'] .lco-dash-context-bar-container {
+    margin-bottom: 6px;
+}
+:root[data-density='compact'] .lco-dash-budget-status {
+    margin-bottom: 8px;
+}
+:root[data-density='compact'] .lco-dash-budget-row {
+    margin-bottom: 4px;
+}
+:root[data-density='compact'] .lco-dash-budget-resets {
+    margin-top: 4px;
 }

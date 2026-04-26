@@ -5,14 +5,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ConversationRecord } from '../../../lib/conversation-store';
 import type { HealthScore } from '../../../lib/health-score';
-import { formatTokens, formatCost } from '../../../lib/format';
+import type { UsageBudgetResult } from '../../../lib/message-types';
+import { formatTokens, formatApiRateCost } from '../../../lib/format';
+import { getContextWindowSize } from '../../../lib/pricing';
+import TurnTicker from './TurnTicker';
 
 interface Props {
     conv: ConversationRecord | null;
     health: HealthScore | null;
+    /** Active tier: drives tier-aware cost labeling (≈$X API rate vs $X). */
+    budget: UsageBudgetResult | null;
 }
 
-export default function ActiveConversation({ conv, health }: Props) {
+export default function ActiveConversation({ conv, health, budget }: Props) {
     const [visible, setVisible] = useState(false);
     const prevConvId = useRef<string | null>(null);
 
@@ -48,8 +53,24 @@ export default function ActiveConversation({ conv, health }: Props) {
     }
 
     const subject = conv.dna?.subject || 'New conversation';
-    const rawPct = conv.lastContextPct;
-    const safePct = Number.isFinite(rawPct) ? Math.min(Math.max(rawPct, 0), 100) : 0;
+
+    // Compute context % from cumulative tokens, not the stored
+    // record.lastContextPct field. The overlay does the same thing for the
+    // same reason (see lib/overlay-state.ts:applyRestoredConversation): some
+    // older records were written with lastContextPct in fractional units
+    // (0.026 instead of 2.6), which renders as a flat zero bar. Tokens are
+    // always correct, so we recompute against the model's window each time.
+    //
+    // getContextWindowSize already falls back to a 200K default for unknown
+    // models (see DEFAULT_CONTEXT_WINDOW in lib/pricing.ts), so we trust
+    // its return value directly instead of restating the magic number here.
+    // Number.isFinite catches the divide-by-zero / NaN cases the helper
+    // can theoretically still produce if pricing data is corrupted.
+    const ctxWindow = getContextWindowSize(conv.model);
+    const usedTokens = conv.totalInputTokens + conv.totalOutputTokens;
+    const computedPct = (usedTokens / ctxWindow) * 100;
+    const safePct = Number.isFinite(computedPct) ? Math.min(Math.max(computedPct, 0), 100) : 0;
+
     const healthLevel = health?.level ?? 'healthy';
     const healthLabel = health?.label ?? 'Healthy';
 
@@ -77,12 +98,17 @@ export default function ActiveConversation({ conv, health }: Props) {
                 <span className="lco-dash-context-label">{Math.round(safePct)}% context</span>
             </div>
 
+            {/* Per-turn ticker. Renders only when at least one tracked turn
+                exists in the conversation; otherwise it silently returns
+                null and the context bar above carries the full visual. */}
+            <TurnTicker turns={conv.turns} />
+
             <div className="lco-dash-active-stats">
                 <span>{conv.turnCount} turn{conv.turnCount === 1 ? '' : 's'}</span>
                 <span>{formatTokens(conv.totalInputTokens + conv.totalOutputTokens)} tok</span>
                 {showDelta
                     ? <span>{totalDelta.toFixed(1)}% of session</span>
-                    : <span>{formatCost(conv.estimatedCost)}</span>
+                    : <span>{formatApiRateCost(conv.estimatedCost, budget)}</span>
                 }
             </div>
         </div>

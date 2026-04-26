@@ -553,7 +553,21 @@ export default defineUnlistedScript(() => {
 
                 const response = await nativeFetch.call(this, input, init);
 
-                if (response.body) {
+                // SSE gate: see lib/sse-gate.ts for the canonical predicate
+                // and rationale. inject.ts cannot import from lib/ (no chrome.*
+                // in MAIN world), so we mirror the predicate inline here.
+                // tests/unit/inject-non-sse.test.ts has a source-text fingerprint
+                // guard that fails if this block drifts from the canonical one.
+                //
+                // startsWith — not includes — because hostile or malformed types
+                // like 'application/x-no-event-stream' would otherwise match.
+                // toLowerCase because HTTP header VALUES are not auto-normalized
+                // by the Headers API (only header NAMES are), so an upstream
+                // capitalising 'TEXT/EVENT-STREAM' is still a legal SSE response.
+                const contentType = (response.headers.get('content-type') ?? '').toLowerCase();
+                const isSseStream = response.status === 200 && contentType.startsWith('text/event-stream');
+
+                if (response.body && isSseStream) {
                     const [pageStream, monitorStream] = response.body.tee();
                     const cleanResponse = new Response(pageStream, {
                         status: response.status,

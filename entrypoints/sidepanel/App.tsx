@@ -15,7 +15,7 @@
 // the budget data to explain why the section is empty. Today and History are
 // org-scoped historical data and remain visible at all times.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useDashboardData } from './hooks/useDashboardData';
 import Header from './components/Header';
 import CollapsibleSection from './components/CollapsibleSection';
@@ -24,6 +24,7 @@ import UsageBudgetCard from './components/UsageBudgetCard';
 import ActiveConversation from './components/ActiveConversation';
 import ConversationList from './components/ConversationList';
 import FeedbackWidget from './components/FeedbackWidget';
+import SettingsDrawer from './components/SettingsDrawer';
 
 export default function App() {
     const {
@@ -36,10 +37,16 @@ export default function App() {
         loading,
     } = useDashboardData();
 
+    // Settings drawer open/close lives in the root so the header can trigger
+    // it and the drawer itself can render as a sibling of the main column.
+    // The drawer component lands in the next commit; for now the trigger
+    // toggles state and renders nothing.
+    const [settingsOpen, setSettingsOpen] = useState(false);
+
     if (loading) {
         return (
             <div className="lco-dash">
-                <Header />
+                <Header onOpenSettings={() => setSettingsOpen(true)} />
                 <div className="lco-dash-loading">Loading...</div>
             </div>
         );
@@ -47,11 +54,14 @@ export default function App() {
 
     return (
         <div className="lco-dash">
-            <Header />
+            <Header onOpenSettings={() => setSettingsOpen(true)} />
 
-            {/* Today: historical, always visible regardless of active tab */}
+            {/* Today: historical, always visible regardless of active tab.
+                budget prop lets the card label dollar amounts as approximate
+                on flat-rate plans (Pro/Max/Free) where the figure is API-
+                equivalent rather than a real charge. */}
             <CollapsibleSection title="Today" storageKey="today" defaultOpen>
-                <TodayCard summary={today} />
+                <TodayCard summary={today} budget={budget} />
             </CollapsibleSection>
 
             {/* Non-Claude tab banner: explains why Usage Budget is empty.
@@ -72,7 +82,7 @@ export default function App() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Active Conversation" storageKey="active" defaultOpen>
-                <ActiveConversation conv={activeConv} health={activeHealth} />
+                <ActiveConversation conv={activeConv} health={activeHealth} budget={budget} />
             </CollapsibleSection>
 
             {/* History: org-scoped, always visible regardless of active tab */}
@@ -81,6 +91,14 @@ export default function App() {
             </CollapsibleSection>
 
             <FeedbackWidget />
+
+            {/* Drawer renders inside the same root so it inherits the panel's
+                CSS scope. <dialog> handles its own portal-like overlay; we
+                only feed it open state and the close callback. */}
+            <SettingsDrawer
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+            />
         </div>
     );
 }
