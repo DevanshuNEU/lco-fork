@@ -235,16 +235,6 @@ body {
     margin-bottom: 12px;
 }
 
-/* Inline SVG sigil. Sits left of the title, no border because the SVG
-   carries its own frame. The dashed-border placeholder this replaces was
-   the most visible "this is a side project" tell in the previous build. */
-.lco-dash-logo {
-    width: 32px;
-    height: 32px;
-    flex-shrink: 0;
-    display: block;
-}
-
 /* Title block grows to fill the row so the gear stays right-aligned. */
 .lco-dash-header-text {
     flex: 1;
@@ -275,15 +265,21 @@ body {
     outline-offset: 2px;
 }
 
-/* Title in the display face at a real size jump from the subtitle below.
-   Letterspacing comes in slightly tighter than default to feel set, not typed. */
+/* Wordmark placeholder until the custom letterform lands. Thin geometric
+   sans at wide tracking gestures toward the eventual logo direction (the
+   AA-merger concept) without committing to it. We use a system-geometric
+   stack so nothing has to download; SF Pro Display on macOS, Inter on
+   anything that has it, system-ui as the floor. Weight 300 reads light
+   enough to feel architectural without dropping into hairline territory
+   that would smear at 96dpi. */
 .lco-dash-title {
-    font-family: var(--lco-font-display);
-    font-size: 24px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
+    font-family: 'SF Pro Display', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-size: 28px;
+    font-weight: 300;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
     color: var(--lco-text);
-    line-height: 1.05;
+    line-height: 1;
 }
 
 .lco-dash-subtitle {
