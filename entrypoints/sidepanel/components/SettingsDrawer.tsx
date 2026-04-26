@@ -47,26 +47,6 @@ export default function SettingsDrawer({ open, onClose }: Props): React.ReactEle
         }
     }, [open]);
 
-    // Cmd+, on Mac and Ctrl+, elsewhere is the platform-standard shortcut for
-    // opening preferences. We only listen while the drawer is closed; once
-    // open, Esc handles dismissal natively via <dialog>.
-    useEffect(() => {
-        if (open) return;
-        function onKey(event: KeyboardEvent): void {
-            const isAccelerator = (event.metaKey || event.ctrlKey) && event.key === ',';
-            if (isAccelerator) {
-                event.preventDefault();
-                // The trigger lives on the parent (header), so we surface this
-                // by dispatching a focus on the gear if available, or rely on
-                // the parent to bind its own listener. Simpler: do nothing
-                // here and let the header listener handle it. Kept as a hook
-                // for future wiring without changing the public API.
-            }
-        }
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, [open]);
-
     if (!ready) return null;
 
     return (
