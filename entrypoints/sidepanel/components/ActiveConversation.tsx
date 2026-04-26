@@ -5,15 +5,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { ConversationRecord } from '../../../lib/conversation-store';
 import type { HealthScore } from '../../../lib/health-score';
-import { formatTokens, formatCost } from '../../../lib/format';
+import type { UsageBudgetResult } from '../../../lib/message-types';
+import { formatTokens, formatApiRateCost } from '../../../lib/format';
 import TurnTicker from './TurnTicker';
 
 interface Props {
     conv: ConversationRecord | null;
     health: HealthScore | null;
+    /** Active tier: drives tier-aware cost labeling (≈$X API rate vs $X). */
+    budget: UsageBudgetResult | null;
 }
 
-export default function ActiveConversation({ conv, health }: Props) {
+export default function ActiveConversation({ conv, health, budget }: Props) {
     const [visible, setVisible] = useState(false);
     const prevConvId = useRef<string | null>(null);
 
@@ -88,7 +91,7 @@ export default function ActiveConversation({ conv, health }: Props) {
                 <span>{formatTokens(conv.totalInputTokens + conv.totalOutputTokens)} tok</span>
                 {showDelta
                     ? <span>{totalDelta.toFixed(1)}% of session</span>
-                    : <span>{formatCost(conv.estimatedCost)}</span>
+                    : <span>{formatApiRateCost(conv.estimatedCost, budget)}</span>
                 }
             </div>
         </div>

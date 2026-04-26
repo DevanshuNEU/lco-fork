@@ -56,9 +56,12 @@ export default function App() {
         <div className="lco-dash">
             <Header onOpenSettings={() => setSettingsOpen(true)} />
 
-            {/* Today: historical, always visible regardless of active tab */}
+            {/* Today: historical, always visible regardless of active tab.
+                budget prop lets the card label dollar amounts as approximate
+                on flat-rate plans (Pro/Max/Free) where the figure is API-
+                equivalent rather than a real charge. */}
             <CollapsibleSection title="Today" storageKey="today" defaultOpen>
-                <TodayCard summary={today} />
+                <TodayCard summary={today} budget={budget} />
             </CollapsibleSection>
 
             {/* Non-Claude tab banner: explains why Usage Budget is empty.
@@ -79,7 +82,7 @@ export default function App() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Active Conversation" storageKey="active" defaultOpen>
-                <ActiveConversation conv={activeConv} health={activeHealth} />
+                <ActiveConversation conv={activeConv} health={activeHealth} budget={budget} />
             </CollapsibleSection>
 
             {/* History: org-scoped, always visible regardless of active tab */}
