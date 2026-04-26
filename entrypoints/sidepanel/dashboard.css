@@ -932,4 +932,224 @@ body {
     .lco-dash-feedback-send {
         transition: none;
     }
+    .lco-settings,
+    .lco-swatch,
+    .lco-density-option {
+        transition: none;
+    }
+}
+
+/* ── Settings drawer ────────────────────────────────────────────────────────
+   Renders as a native <dialog>. The browser owns focus trap, Escape key,
+   and inert-backdrop semantics; we only style the surface. The drawer fills
+   the panel rather than sliding in from the side because the panel is too
+   narrow (320-400px) for a side-slide to feel like a drawer rather than a
+   takeover. */
+
+.lco-settings {
+    width: 100%;
+    max-width: 360px;
+    margin: auto;
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius);
+    background: var(--lco-bg-card);
+    color: var(--lco-text);
+    padding: 0;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.20);
+}
+
+.lco-settings::backdrop {
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(2px);
+}
+
+.lco-settings-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--lco-border);
+}
+
+.lco-settings-title {
+    /* Reuses .lco-section styling (lowercase italic display face) so the
+       drawer header reads like every other section heading on the panel. */
+    margin: 0;
+}
+
+.lco-settings-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--lco-text-muted);
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: var(--lco-radius-sm);
+    transition: color var(--lco-transition), background var(--lco-transition);
+}
+.lco-settings-close:hover {
+    color: var(--lco-text);
+    background: var(--lco-bg-hover);
+}
+.lco-settings-close:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+
+.lco-settings-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.lco-settings-block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* Theme swatches: 2x2 grid. Each swatch shows a color preview, label, and
+   short description. Selected one gets the accent ring. */
+.lco-swatches {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.lco-swatch {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 10px;
+    background: var(--lco-bg);
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color var(--lco-transition), background var(--lco-transition);
+    font-family: var(--lco-font);
+    color: inherit;
+}
+.lco-swatch:hover {
+    background: var(--lco-bg-hover);
+}
+.lco-swatch:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+.lco-swatch--on {
+    border-color: var(--lco-accent);
+    box-shadow: inset 0 0 0 1px var(--lco-accent);
+}
+
+.lco-swatch-preview {
+    width: 100%;
+    height: 28px;
+    border-radius: 3px;
+    border: 1px solid var(--lco-border);
+}
+
+/* Per-theme preview tiles. The system tile uses a half-light, half-dark
+   diagonal so the user can see at a glance that it follows the OS. */
+.lco-swatch-preview--system {
+    background: linear-gradient(135deg, #f5f1ea 0%, #f5f1ea 49%, #1c1a18 51%, #1c1a18 100%);
+}
+.lco-swatch-preview--dawn   { background: #f5f1ea; }
+.lco-swatch-preview--dusk   { background: #1c1a18; }
+.lco-swatch-preview--void   { background: #000000; }
+
+.lco-swatch-label {
+    font-family: var(--lco-font-display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--lco-text);
+}
+
+.lco-swatch-desc {
+    font-family: var(--lco-font-mono);
+    font-size: 9px;
+    color: var(--lco-text-muted);
+    letter-spacing: 0.06em;
+}
+
+/* Density options stack vertically, each with a description. Same selection
+   pattern as theme swatches but laid out as full-width rows. */
+.lco-density-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.lco-density-option {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    padding: 10px;
+    background: var(--lco-bg);
+    border: 1px solid var(--lco-border);
+    border-radius: var(--lco-radius-sm);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color var(--lco-transition), background var(--lco-transition);
+    font-family: var(--lco-font);
+    color: inherit;
+}
+.lco-density-option:hover {
+    background: var(--lco-bg-hover);
+}
+.lco-density-option:focus-visible {
+    outline: 2px solid var(--lco-accent);
+    outline-offset: 2px;
+}
+.lco-density-option--on {
+    border-color: var(--lco-accent);
+    box-shadow: inset 0 0 0 1px var(--lco-accent);
+}
+
+.lco-density-label-text {
+    font-family: var(--lco-font-display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--lco-text);
+}
+
+.lco-density-desc {
+    font-family: var(--lco-font-mono);
+    font-size: 9px;
+    color: var(--lco-text-muted);
+    letter-spacing: 0.06em;
+}
+
+/* Compact density variant: tightens vertical rhythm across the panel. The
+   intent is to roughly halve interior gaps for power users who want more
+   info per glance without changing typography. */
+:root[data-density='compact'] .lco-dash {
+    padding: 12px 10px;
+}
+:root[data-density='compact'] .lco-dash-section {
+    margin-bottom: 4px;
+}
+:root[data-density='compact'] .lco-dash-section-inner {
+    padding: 2px 0 4px;
+}
+:root[data-density='compact'] .lco-dash-active {
+    padding: 4px 0;
+}
+:root[data-density='compact'] .lco-dash-active-subject {
+    margin-bottom: 6px;
+}
+:root[data-density='compact'] .lco-dash-context-bar-container {
+    margin-bottom: 6px;
+}
+:root[data-density='compact'] .lco-dash-budget-status {
+    margin-bottom: 8px;
+}
+:root[data-density='compact'] .lco-dash-budget-row {
+    margin-bottom: 4px;
+}
+:root[data-density='compact'] .lco-dash-budget-resets {
+    margin-top: 4px;
 }

@@ -24,6 +24,7 @@ import UsageBudgetCard from './components/UsageBudgetCard';
 import ActiveConversation from './components/ActiveConversation';
 import ConversationList from './components/ConversationList';
 import FeedbackWidget from './components/FeedbackWidget';
+import SettingsDrawer from './components/SettingsDrawer';
 
 export default function App() {
     const {
@@ -87,6 +88,14 @@ export default function App() {
             </CollapsibleSection>
 
             <FeedbackWidget />
+
+            {/* Drawer renders inside the same root so it inherits the panel's
+                CSS scope. <dialog> handles its own portal-like overlay; we
+                only feed it open state and the close callback. */}
+            <SettingsDrawer
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+            />
         </div>
     );
 }
