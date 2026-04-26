@@ -159,10 +159,21 @@ export async function showEnableBanner(): Promise<void> {
     }
 
     enableBtn.addEventListener('click', async () => {
-        await browser.storage.local.set({ lco_enabled_claude: true });
-        banner.remove();
-        style.remove();
-        window.location.reload();
+        // The reload only happens after persistence succeeds. Without the
+        // try/catch, a quota-exceeded or extension-restricted rejection
+        // would throw out of the click handler unhandled, the banner
+        // would never be removed, and the page would never reload —
+        // user-visible "nothing happened" outcome. With the catch we
+        // leave the banner in place so the user can retry, and we log
+        // the error so future support cases surface it.
+        try {
+            await browser.storage.local.set({ lco_enabled_claude: true });
+            banner.remove();
+            style.remove();
+            window.location.reload();
+        } catch (err) {
+            console.warn('[LCO] Failed to persist enable flag:', err);
+        }
     });
 
     dismissBtn.addEventListener('click', () => {
