@@ -60,9 +60,15 @@ export default function ActiveConversation({ conv, health, budget }: Props) {
     // older records were written with lastContextPct in fractional units
     // (0.026 instead of 2.6), which renders as a flat zero bar. Tokens are
     // always correct, so we recompute against the model's window each time.
-    const ctxWindow = getContextWindowSize(conv.model) || 200000;
+    //
+    // getContextWindowSize already falls back to a 200K default for unknown
+    // models (see DEFAULT_CONTEXT_WINDOW in lib/pricing.ts), so we trust
+    // its return value directly instead of restating the magic number here.
+    // Number.isFinite catches the divide-by-zero / NaN cases the helper
+    // can theoretically still produce if pricing data is corrupted.
+    const ctxWindow = getContextWindowSize(conv.model);
     const usedTokens = conv.totalInputTokens + conv.totalOutputTokens;
-    const computedPct = ctxWindow > 0 ? (usedTokens / ctxWindow) * 100 : 0;
+    const computedPct = (usedTokens / ctxWindow) * 100;
     const safePct = Number.isFinite(computedPct) ? Math.min(Math.max(computedPct, 0), 100) : 0;
 
     const healthLevel = health?.level ?? 'healthy';
