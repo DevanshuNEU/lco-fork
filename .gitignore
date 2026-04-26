@@ -40,3 +40,7 @@ test-results/
 *.njsproj
 *.sln
 *.sw?
+
+# Local tooling output: Claude Code workspace, graphify knowledge graph
+.claude/
+graphify-out/
