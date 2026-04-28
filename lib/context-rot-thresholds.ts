@@ -117,7 +117,7 @@ export const ABSOLUTE_CRITICAL_FLOOR = 90;
 
 /**
  * Below this context % the coaching layer keeps the message minimal
- * ("fresh and responsive") instead of spelling out the precentage. The
+ * ("fresh and responsive") instead of spelling out the percentage. The
  * Health Agent uses the same constant to gate its "fast growth" warning,
  * since tiny chats can show large per-turn growth as a percentage with
  * no real risk. Lives here so both the threshold agent's coaching copy
