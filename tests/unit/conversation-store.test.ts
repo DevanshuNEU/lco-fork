@@ -22,14 +22,19 @@ import {
     getUsageLimits,
     appendUsageDelta,
     getUsageDeltas,
+    appendUsageBudgetSnapshot,
+    getUsageBudgetSnapshots,
+    clearUsageBudgetSnapshots,
     MAX_TURNS_PER_RECORD,
     MAX_USAGE_DELTAS,
+    MAX_USAGE_BUDGET_SNAPSHOTS,
     CRITICAL_CONTEXT_PCT,
     type StorageArea,
     type TurnRecord,
     type ConversationRecord,
     type UsageDelta,
 } from '../../lib/conversation-store';
+import type { UsageBudgetSnapshot } from '../../lib/weekly-cap-eta';
 import type { UsageLimitsData } from '../../lib/message-types';
 
 const TEST_ORG = 'org-test-123';
@@ -1009,5 +1014,82 @@ describe('recordTurn with deltaUtilization', () => {
         expect(record?.turns[0].deltaUtilization).toBe(2.0);
         expect(record?.turns[1].deltaUtilization).toBe(3.5);
         expect(record?.turns[2].deltaUtilization).toBeNull();
+    });
+});
+
+// ── Usage Budget Snapshots ─────────────────────────────────────────────────────
+// appendUsageBudgetSnapshot / getUsageBudgetSnapshots / clearUsageBudgetSnapshots
+// These feed the weekly-cap ETA agent (lib/weekly-cap-eta.ts).
+
+describe('usage budget snapshots', () => {
+    function makeSnap(weeklyPct: number, timestamp = Date.now()): UsageBudgetSnapshot {
+        return { timestamp, weeklyPct, sessionPct: 10 };
+    }
+
+    it('returns an empty array when no snapshots have been appended', async () => {
+        const result = await getUsageBudgetSnapshots(TEST_ORG);
+        expect(result).toEqual([]);
+    });
+
+    it('appends a single snapshot and reads it back', async () => {
+        const snap = makeSnap(25, 1_700_000_000_000);
+        await appendUsageBudgetSnapshot(TEST_ORG, snap);
+        const result = await getUsageBudgetSnapshots(TEST_ORG);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toEqual(snap);
+    });
+
+    it('appends multiple snapshots in order', async () => {
+        await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(10, 1_000));
+        await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(20, 2_000));
+        await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(30, 3_000));
+        const result = await getUsageBudgetSnapshots(TEST_ORG);
+        expect(result).toHaveLength(3);
+        expect(result[0].weeklyPct).toBe(10);
+        expect(result[2].weeklyPct).toBe(30);
+    });
+
+    it(`prunes oldest entries when count exceeds MAX_USAGE_BUDGET_SNAPSHOTS (${MAX_USAGE_BUDGET_SNAPSHOTS})`, async () => {
+        for (let i = 0; i < MAX_USAGE_BUDGET_SNAPSHOTS + 5; i++) {
+            await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(i, i));
+        }
+        const result = await getUsageBudgetSnapshots(TEST_ORG);
+        expect(result).toHaveLength(MAX_USAGE_BUDGET_SNAPSHOTS);
+        // Oldest 5 were pruned; the first remaining has weeklyPct = 5.
+        expect(result[0].weeklyPct).toBe(5);
+    });
+
+    it('clearUsageBudgetSnapshots removes all snapshots for the account', async () => {
+        await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(40));
+        await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(50));
+        await clearUsageBudgetSnapshots(TEST_ORG);
+        const result = await getUsageBudgetSnapshots(TEST_ORG);
+        expect(result).toEqual([]);
+    });
+
+    it('clear followed by append works correctly (post-reset rebuild)', async () => {
+        await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(80));
+        await clearUsageBudgetSnapshots(TEST_ORG);
+        await appendUsageBudgetSnapshot(TEST_ORG, makeSnap(5, 99_999));
+        const result = await getUsageBudgetSnapshots(TEST_ORG);
+        expect(result).toHaveLength(1);
+        expect(result[0].weeklyPct).toBe(5);
+    });
+
+    it('isolates snapshots between accounts', async () => {
+        const orgA = 'org-snap-aaa';
+        const orgB = 'org-snap-bbb';
+        await appendUsageBudgetSnapshot(orgA, makeSnap(30));
+        await appendUsageBudgetSnapshot(orgB, makeSnap(70));
+        const a = await getUsageBudgetSnapshots(orgA);
+        const b = await getUsageBudgetSnapshots(orgB);
+        expect(a[0].weeklyPct).toBe(30);
+        expect(b[0].weeklyPct).toBe(70);
+    });
+
+    it('throws when accountId is empty string', async () => {
+        await expect(
+            appendUsageBudgetSnapshot('', makeSnap(10)),
+        ).rejects.toThrow('[LCO] accountId required for scoped storage key');
     });
 });
