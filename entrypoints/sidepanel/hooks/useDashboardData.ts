@@ -189,70 +189,6 @@ export function useDashboardData(): DashboardData {
         }
     }, []);
 
-    const loadActiveConversation = useCallback(async (tabId: number) => {
-        try {
-            // Read the active conversation and org ID for this tab from session storage.
-            const cKey = `activeConv_${tabId}`;
-            const oKey = `activeOrg_${tabId}`;
-            const result = await chrome.storage.session.get([cKey, oKey]);
-            const convId = result[cKey] as string | undefined;
-            const orgId = result[oKey] as string | undefined;
-
-            // Treat the session-read orgId as the source of truth.
-            // Update the ref immediately (clears to '' on logout) so loadConversations
-            // and loadToday always query the correct account scope.
-            const prevOrg = orgIdRef.current;
-            orgIdRef.current = orgId ?? '';
-
-            // Org changed: includes first-login (prevOrg '' → real org) and account
-            // switch or logout. Any transition should reload history and today.
-            const orgChanged = prevOrg !== (orgId ?? '');
-
-            if (!convId || !orgId) {
-                setActiveConv(null);
-                setActiveHealth(null);
-                // Org cleared (logout): reset dashboard to empty state.
-                if (!orgId && prevOrg) {
-                    setToday(null);
-                    setConversations([]);
-                    setBudget(null);
-                    setTokenEconomics(null);
-                }
-                return;
-            }
-
-            const conv = await getConversation(orgId, convId);
-            setActiveConv(conv);
-
-            if (conv) {
-                const growthRate = computeGrowthRate(conv.turns.map(t => t.contextPct));
-                // Side panel renders historical / restored conversations. We do not
-                // have the live draft text here, so detail-heavy is conservatively
-                // false. Model comes from the stored conversation record.
-                const health = computeHealthScore({
-                    contextPct: conv.lastContextPct,
-                    turnCount: conv.turnCount,
-                    growthRate,
-                    model: conv.model,
-                    isDetailHeavy: false,
-                });
-                setActiveHealth(health);
-            } else {
-                setActiveHealth(null);
-            }
-
-            // Account switched: reload history, today, and token economics for the new org.
-            if (orgChanged) {
-                loadConversations();
-                loadToday();
-                loadTokenEconomics();
-            }
-        } catch {
-            setActiveConv(null);
-            setActiveHealth(null);
-        }
-    }, [loadConversations, loadToday, loadTokenEconomics]);
-
     const loadBudget = useCallback(async () => {
         try {
             const orgId = orgIdRef.current;
@@ -286,6 +222,73 @@ export function useDashboardData(): DashboardData {
             // Non-critical: ETA panel simply stays hidden.
         }
     }, []);
+
+    const loadActiveConversation = useCallback(async (tabId: number) => {
+        try {
+            // Read the active conversation and org ID for this tab from session storage.
+            const cKey = `activeConv_${tabId}`;
+            const oKey = `activeOrg_${tabId}`;
+            const result = await chrome.storage.session.get([cKey, oKey]);
+            const convId = result[cKey] as string | undefined;
+            const orgId = result[oKey] as string | undefined;
+
+            // Treat the session-read orgId as the source of truth.
+            // Update the ref immediately (clears to '' on logout) so loadConversations
+            // and loadToday always query the correct account scope.
+            const prevOrg = orgIdRef.current;
+            orgIdRef.current = orgId ?? '';
+
+            // Org changed: includes first-login (prevOrg '' → real org) and account
+            // switch or logout. Any transition should reload history and today.
+            const orgChanged = prevOrg !== (orgId ?? '');
+
+            if (!convId || !orgId) {
+                setActiveConv(null);
+                setActiveHealth(null);
+                // Org cleared (logout): reset dashboard to empty state.
+                if (!orgId && prevOrg) {
+                    setToday(null);
+                    setConversations([]);
+                    setBudget(null);
+                    setWeeklyEta(null);
+                    setTokenEconomics(null);
+                }
+                return;
+            }
+
+            const conv = await getConversation(orgId, convId);
+            setActiveConv(conv);
+
+            if (conv) {
+                const growthRate = computeGrowthRate(conv.turns.map(t => t.contextPct));
+                // Side panel renders historical / restored conversations. We do not
+                // have the live draft text here, so detail-heavy is conservatively
+                // false. Model comes from the stored conversation record.
+                const health = computeHealthScore({
+                    contextPct: conv.lastContextPct,
+                    turnCount: conv.turnCount,
+                    growthRate,
+                    model: conv.model,
+                    isDetailHeavy: false,
+                });
+                setActiveHealth(health);
+            } else {
+                setActiveHealth(null);
+            }
+
+            // Account switched: reload history, today, and token economics for the new org.
+            if (orgChanged) {
+                loadConversations();
+                loadToday();
+                loadBudget();
+                loadWeeklyEta();
+                loadTokenEconomics();
+            }
+        } catch {
+            setActiveConv(null);
+            setActiveHealth(null);
+        }
+    }, [loadConversations, loadToday, loadBudget, loadWeeklyEta, loadTokenEconomics]);
 
     // ── Initial load ──────────────────────────────────────────────────────────
 

@@ -363,12 +363,14 @@ async function initializeMonitoring(): Promise<void> {
                 // monthly% on Enterprise) as the initial before-snapshot so the
                 // first STREAM_COMPLETE can compute a delta in matching units.
                 // The unsupported variant has nothing to track or display.
+                const orgIdForEta = currentOrgId;
                 fetchAndStoreUsageLimits(currentOrgId).then(async budget => {
                     if (budget !== null && budget.kind !== 'unsupported') {
                         lastKnownUtilization = getTrackedUtilization(budget);
                         state = applyUsageBudget(state, budget);
                         if (budget.kind === 'session') {
-                            const eta = await computeEtaForOrg(currentOrgId!);
+                            const eta = await computeEtaForOrg(orgIdForEta);
+                            if (currentOrgId !== orgIdForEta) return;
                             state = applyWeeklyEta(state, eta);
                         }
                         overlay.render(state);

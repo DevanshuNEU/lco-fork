@@ -231,9 +231,9 @@ describe('formatEtaLabel', () => {
     });
 
     it('contains a weekday abbreviation', () => {
-        // BASE is Tuesday 2026-04-07; 6h later is still Tuesday.
-        const label = formatEtaLabel(BASE + 6 * HOUR_MS);
-        expect(label).toMatch(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/);
+        const ts = BASE + 6 * HOUR_MS;
+        const expectedWeekday = new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(new Date(ts));
+        expect(formatEtaLabel(ts)).toContain(expectedWeekday);
     });
 });
 
