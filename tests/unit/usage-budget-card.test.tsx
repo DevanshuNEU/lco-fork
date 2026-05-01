@@ -18,6 +18,7 @@ import { render, screen } from '@testing-library/react';
 import UsageBudgetCard from '../../entrypoints/sidepanel/components/UsageBudgetCard';
 import type { UsageBudgetSession, UsageBudgetCredit, UsageBudgetResult } from '../../lib/message-types';
 import type { WeeklyEta } from '../../lib/weekly-cap-eta';
+import type { SpendTrajectory, TopSpender } from '../../lib/spend-trajectory';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -201,5 +202,155 @@ describe('UsageBudgetCard — weekly ETA', () => {
     it('does not render ETA on the credit (Enterprise) variant', () => {
         render(<UsageBudgetCard budget={creditBudget()} isClaudeTab={true} weeklyEta={makeEta('high')} />);
         expect(screen.queryByText(/At this pace/)).toBeNull();
+    });
+});
+
+// ── Spend trajectory + top spenders (GET-22) ─────────────────────────────────
+// The trajectory line and the expandable top-spenders section render on the
+// credit variant only. They are absent on session and unsupported variants.
+
+describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
+    function makeTrajectory(overrides: Partial<SpendTrajectory> = {}): SpendTrajectory {
+        return {
+            projectedSpentCents: 31200,
+            projectedUtilizationPct: 62.4,
+            daysRemaining: 16,
+            confidence: 'high',
+            ...overrides,
+        };
+    }
+
+    function makeSpenders(): TopSpender[] {
+        return [
+            {
+                conversationId: 'conv-A',
+                totalCostCents: 9412,
+                turnCount: 18,
+                subject: 'Refactor auth middleware',
+            },
+            {
+                conversationId: 'conv-B',
+                totalCostCents: 4280,
+                turnCount: 11,
+                subject: 'Q2 hiring plan draft',
+            },
+            {
+                conversationId: 'conv-C',
+                totalCostCents: 2150,
+                turnCount: 6,
+                // Subject fallback used by the hook when getConversation returns null.
+                subject: 'Untitled conversation',
+            },
+        ];
+    }
+
+    it('renders "Need 7+ days" placeholder when trajectory is null', () => {
+        render(
+            <UsageBudgetCard
+                budget={creditBudget()}
+                isClaudeTab={true}
+                spendTrajectory={null}
+                topSpendConversations={[]}
+            />,
+        );
+        expect(screen.getByText(/Need 7\+ days of usage/)).toBeTruthy();
+    });
+
+    it('renders high-confidence "On track" copy with projected and limit amounts', () => {
+        render(
+            <UsageBudgetCard
+                budget={creditBudget()}
+                isClaudeTab={true}
+                spendTrajectory={makeTrajectory({ confidence: 'high' })}
+                topSpendConversations={[]}
+            />,
+        );
+        expect(screen.getByText(/On track for \$312\.00 of \$500\.00 by/)).toBeTruthy();
+    });
+
+    it('renders medium-confidence copy with the firm-up qualifier', () => {
+        render(
+            <UsageBudgetCard
+                budget={creditBudget()}
+                isClaudeTab={true}
+                spendTrajectory={makeTrajectory({ confidence: 'medium' })}
+                topSpendConversations={[]}
+            />,
+        );
+        expect(screen.getByText(/Estimated month-end:/)).toBeTruthy();
+        expect(screen.getByText(/Estimate firms up over the next week/)).toBeTruthy();
+    });
+
+    it('renders low-confidence copy with the "need more data" hedge', () => {
+        render(
+            <UsageBudgetCard
+                budget={creditBudget()}
+                isClaudeTab={true}
+                spendTrajectory={makeTrajectory({ confidence: 'low' })}
+                topSpendConversations={[]}
+            />,
+        );
+        expect(screen.getByText(/^Estimating:/)).toBeTruthy();
+        expect(screen.getByText(/Need more data for confidence/)).toBeTruthy();
+    });
+
+    it('renders top spenders using the pre-resolved subject on each entry', () => {
+        render(
+            <UsageBudgetCard
+                budget={creditBudget()}
+                isClaudeTab={true}
+                spendTrajectory={makeTrajectory()}
+                topSpendConversations={makeSpenders()}
+            />,
+        );
+        expect(screen.getByText('Top conversations this month')).toBeTruthy();
+        expect(screen.getByText('Refactor auth middleware')).toBeTruthy();
+        expect(screen.getByText('Q2 hiring plan draft')).toBeTruthy();
+        // conv-C carries the fallback subject set by the hook when getConversation
+        // returned null, so the card never has to fall back on its own.
+        expect(screen.getByText('Untitled conversation')).toBeTruthy();
+    });
+
+    it('renders cost and turn count for each spender', () => {
+        render(
+            <UsageBudgetCard
+                budget={creditBudget()}
+                isClaudeTab={true}
+                spendTrajectory={makeTrajectory()}
+                topSpendConversations={makeSpenders()}
+            />,
+        );
+        expect(screen.getByText('$94.12')).toBeTruthy();
+        expect(screen.getByText('$42.80')).toBeTruthy();
+        expect(screen.getByText('$21.50')).toBeTruthy();
+        expect(screen.getByText('18 turns')).toBeTruthy();
+        expect(screen.getByText('11 turns')).toBeTruthy();
+        expect(screen.getByText('6 turns')).toBeTruthy();
+    });
+
+    it('hides the top-spenders section when the list is empty', () => {
+        render(
+            <UsageBudgetCard
+                budget={creditBudget()}
+                isClaudeTab={true}
+                spendTrajectory={makeTrajectory()}
+                topSpendConversations={[]}
+            />,
+        );
+        expect(screen.queryByText('Top conversations this month')).toBeNull();
+    });
+
+    it('does not render trajectory copy on the session variant', () => {
+        render(
+            <UsageBudgetCard
+                budget={sessionBudget()}
+                isClaudeTab={true}
+                spendTrajectory={makeTrajectory()}
+                topSpendConversations={makeSpenders()}
+            />,
+        );
+        expect(screen.queryByText(/On track for/)).toBeNull();
+        expect(screen.queryByText(/Need 7\+ days of usage/)).toBeNull();
+        expect(screen.queryByText('Top conversations this month')).toBeNull();
     });
 });
