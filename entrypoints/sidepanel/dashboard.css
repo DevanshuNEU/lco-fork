@@ -767,6 +767,15 @@ body {
     display: none;
 }
 
+/* Visible keyboard focus state. The native disclosure marker is hidden above,
+   so without this rule keyboard users have no indicator that the summary has
+   focus. Border-radius matches the row pattern. */
+.lco-dash-budget-spenders-summary:focus-visible {
+    outline: 2px solid var(--lco-focus-ring, var(--lco-text));
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
 .lco-dash-budget-spenders-summary::before {
     content: '▸';
     display: inline-block;

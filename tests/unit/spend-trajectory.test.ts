@@ -127,11 +127,12 @@ describe('projectMonthEnd', () => {
         expect(projectMonthEnd(deltas, APRIL_15, -100, 5000)).toBeNull();
     });
 
-    it('returns null on the last second of the month (no days remaining)', () => {
+    it('still projects on the last second of the month (1 day remaining)', () => {
         const lastSecond = new Date(2026, 3, 30, 23, 59, 59, 999).getTime();
         const deltas = dailyDeltas(14, 10, lastSecond);
         expect(daysUntilNextMonth(lastSecond)).toBe(1);
-        // 1 day remaining is fine; null only fires when we are exactly at month boundary.
+        // 1 day remaining is enough: the projection adds a small remainder onto
+        // currentUsedCents and returns a non-null trajectory.
         expect(projectMonthEnd(deltas, lastSecond, 50000, 5000)).not.toBeNull();
     });
 
@@ -280,6 +281,18 @@ describe('aggregateByConversation', () => {
         const ranked = aggregateByConversation(deltas, monthStart);
         expect(ranked).toEqual([
             { conversationId: 'current', totalCostCents: 50, turnCount: 1 },
+        ]);
+    });
+
+    it('filters deltas after untilTimestamp (clock-skew safety)', () => {
+        const future = APRIL_15 + DAY_MS;
+        const deltas = [
+            delta(APRIL_15, 1.00, 'now'),
+            delta(future, 99.00, 'future'),
+        ];
+        const ranked = aggregateByConversation(deltas, 0, APRIL_15);
+        expect(ranked).toEqual([
+            { conversationId: 'now', totalCostCents: 100, turnCount: 1 },
         ]);
     });
 

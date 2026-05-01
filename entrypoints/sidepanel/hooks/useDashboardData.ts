@@ -36,7 +36,7 @@ import {
     aggregateByConversation,
     startOfMonth,
     type SpendTrajectory,
-    type ConversationSpend,
+    type TopSpender,
 } from '../../../lib/spend-trajectory';
 import type { UsageBudgetResult } from '../../../lib/message-types';
 
@@ -129,11 +129,13 @@ export interface DashboardData {
      */
     spendTrajectory: SpendTrajectory | null;
     /**
-     * Top conversations of the current month, ranked descending by total cost.
-     * Empty array when no credit-tier deltas exist yet, or on session/unsupported
-     * tiers. Capped at TOP_SPENDERS_LIMIT entries.
+     * Top conversations of the current month, ranked descending by total cost,
+     * with their human-readable subjects already resolved from storage so the
+     * card never has to join against the truncated History list. Empty array
+     * on session/unsupported tiers and when no credit-tier deltas exist yet.
+     * Capped at TOP_SPENDERS_LIMIT entries.
      */
-    topSpendConversations: ConversationSpend[];
+    topSpendConversations: TopSpender[];
     loading: boolean;
 }
 
@@ -149,7 +151,7 @@ export function useDashboardData(): DashboardData {
     const [tokenEconomics, setTokenEconomics] = useState<TokenEconomicsResult | null>(null);
     const [weeklyEta, setWeeklyEta] = useState<WeeklyEta | null>(null);
     const [spendTrajectory, setSpendTrajectory] = useState<SpendTrajectory | null>(null);
-    const [topSpendConversations, setTopSpendConversations] = useState<ConversationSpend[]>([]);
+    const [topSpendConversations, setTopSpendConversations] = useState<TopSpender[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Track current tab ID so we know which activeConv_ key to watch.
@@ -289,8 +291,22 @@ export function useDashboardData(): DashboardData {
                 limits.monthlyLimitCents,
                 limits.usedCents,
             );
-            const topSpenders = aggregateByConversation(deltas, startOfMonth(now))
+            const ranked = aggregateByConversation(deltas, startOfMonth(now), now)
                 .slice(0, TOP_SPENDERS_LIMIT);
+
+            // Resolve subjects per conversationId via direct getConversation
+            // calls, not via the History list (which is capped at CONVERSATION_LIMIT
+            // and could miss an older top spender). Parallel reads; the result
+            // is ordered to match `ranked` since Promise.all preserves index.
+            const records = await Promise.all(
+                ranked.map((spender) => getConversation(orgId, spender.conversationId)),
+            );
+            if (orgIdRef.current !== orgId || spendTrajectoryRequestIdRef.current !== requestId) return;
+
+            const topSpenders: TopSpender[] = ranked.map((spender, i) => ({
+                ...spender,
+                subject: records[i]?.dna?.subject || 'Untitled conversation',
+            }));
 
             setSpendTrajectory(trajectory);
             setTopSpendConversations(topSpenders);
@@ -504,8 +520,12 @@ export function useDashboardData(): DashboardData {
                 loadWeeklyEta();
                 loadSpendTrajectory();
             } else {
-                // Explicitly clear budget -- do not show stale data from the previous
-                // Claude tab while the user is on Gmail, GitHub, etc.
+                // Explicitly clear live data -- do not show stale numbers from the
+                // previous Claude tab while the user is on Gmail, GitHub, etc.
+                // Bump the trajectory and ETA request IDs first so any in-flight
+                // resolutions land in the past and skip their setState calls.
+                weeklyEtaRequestIdRef.current++;
+                spendTrajectoryRequestIdRef.current++;
                 setBudget(null);
                 setWeeklyEta(null);
                 setSpendTrajectory(null);
@@ -536,7 +556,10 @@ export function useDashboardData(): DashboardData {
                 loadWeeklyEta();
                 loadSpendTrajectory();
             } else {
-                // Navigated away: clear live data immediately.
+                // Navigated away: clear live data immediately. Same request-id bump
+                // as onTabActivated to invalidate any in-flight loaders.
+                weeklyEtaRequestIdRef.current++;
+                spendTrajectoryRequestIdRef.current++;
                 setBudget(null);
                 setWeeklyEta(null);
                 setSpendTrajectory(null);
@@ -552,6 +575,10 @@ export function useDashboardData(): DashboardData {
             // The closed tab was on Claude; mark the panel as not-Claude since there
             // is no active tab to track. The user will need to click another tab.
             applyIsClaudeTab(false);
+            // Same request-id bump as the other clear paths so any in-flight
+            // loaders cannot repopulate the card after the tab is gone.
+            weeklyEtaRequestIdRef.current++;
+            spendTrajectoryRequestIdRef.current++;
             setBudget(null);
             setWeeklyEta(null);
             setSpendTrajectory(null);

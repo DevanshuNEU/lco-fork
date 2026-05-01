@@ -18,8 +18,7 @@ import { render, screen } from '@testing-library/react';
 import UsageBudgetCard from '../../entrypoints/sidepanel/components/UsageBudgetCard';
 import type { UsageBudgetSession, UsageBudgetCredit, UsageBudgetResult } from '../../lib/message-types';
 import type { WeeklyEta } from '../../lib/weekly-cap-eta';
-import type { SpendTrajectory, ConversationSpend } from '../../lib/spend-trajectory';
-import type { ConversationRecord } from '../../lib/conversation-store';
+import type { SpendTrajectory, TopSpender } from '../../lib/spend-trajectory';
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -221,56 +220,26 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
         };
     }
 
-    function makeSpenders(): ConversationSpend[] {
-        return [
-            { conversationId: 'conv-A', totalCostCents: 9412, turnCount: 18 },
-            { conversationId: 'conv-B', totalCostCents: 4280, turnCount: 11 },
-            { conversationId: 'conv-C', totalCostCents: 2150, turnCount: 6 },
-        ];
-    }
-
-    function makeConversations(): ConversationRecord[] {
-        const baseTurn = {
-            turnNumber: 1,
-            inputTokens: 0,
-            outputTokens: 0,
-            model: 'claude-sonnet-4-6',
-            contextPct: 0,
-            cost: 0,
-            completedAt: 0,
-        };
+    function makeSpenders(): TopSpender[] {
         return [
             {
-                id: 'conv-A',
-                startedAt: 0,
-                lastActiveAt: 0,
-                finalized: false,
+                conversationId: 'conv-A',
+                totalCostCents: 9412,
                 turnCount: 18,
-                totalInputTokens: 0,
-                totalOutputTokens: 0,
-                peakContextPct: 0,
-                lastContextPct: 0,
-                model: 'claude-sonnet-4-6',
-                estimatedCost: 94.12,
-                turns: [baseTurn],
-                dna: { subject: 'Refactor auth middleware', lastContext: '', hints: [] },
-                _v: 1,
+                subject: 'Refactor auth middleware',
             },
             {
-                id: 'conv-B',
-                startedAt: 0,
-                lastActiveAt: 0,
-                finalized: false,
+                conversationId: 'conv-B',
+                totalCostCents: 4280,
                 turnCount: 11,
-                totalInputTokens: 0,
-                totalOutputTokens: 0,
-                peakContextPct: 0,
-                lastContextPct: 0,
-                model: 'claude-sonnet-4-6',
-                estimatedCost: 42.80,
-                turns: [baseTurn],
-                dna: { subject: 'Q2 hiring plan draft', lastContext: '', hints: [] },
-                _v: 1,
+                subject: 'Q2 hiring plan draft',
+            },
+            {
+                conversationId: 'conv-C',
+                totalCostCents: 2150,
+                turnCount: 6,
+                // Subject fallback used by the hook when getConversation returns null.
+                subject: 'Untitled conversation',
             },
         ];
     }
@@ -282,7 +251,6 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
                 isClaudeTab={true}
                 spendTrajectory={null}
                 topSpendConversations={[]}
-                conversations={[]}
             />,
         );
         expect(screen.getByText(/Need 7\+ days of usage/)).toBeTruthy();
@@ -295,7 +263,6 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
                 isClaudeTab={true}
                 spendTrajectory={makeTrajectory({ confidence: 'high' })}
                 topSpendConversations={[]}
-                conversations={[]}
             />,
         );
         expect(screen.getByText(/On track for \$312\.00 of \$500\.00 by/)).toBeTruthy();
@@ -308,7 +275,6 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
                 isClaudeTab={true}
                 spendTrajectory={makeTrajectory({ confidence: 'medium' })}
                 topSpendConversations={[]}
-                conversations={[]}
             />,
         );
         expect(screen.getByText(/Estimated month-end:/)).toBeTruthy();
@@ -322,27 +288,26 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
                 isClaudeTab={true}
                 spendTrajectory={makeTrajectory({ confidence: 'low' })}
                 topSpendConversations={[]}
-                conversations={[]}
             />,
         );
         expect(screen.getByText(/^Estimating:/)).toBeTruthy();
         expect(screen.getByText(/Need more data for confidence/)).toBeTruthy();
     });
 
-    it('renders top spenders with subjects looked up from the conversations list', () => {
+    it('renders top spenders using the pre-resolved subject on each entry', () => {
         render(
             <UsageBudgetCard
                 budget={creditBudget()}
                 isClaudeTab={true}
                 spendTrajectory={makeTrajectory()}
                 topSpendConversations={makeSpenders()}
-                conversations={makeConversations()}
             />,
         );
         expect(screen.getByText('Top conversations this month')).toBeTruthy();
         expect(screen.getByText('Refactor auth middleware')).toBeTruthy();
         expect(screen.getByText('Q2 hiring plan draft')).toBeTruthy();
-        // conv-C has no matching ConversationRecord in the join: fallback subject.
+        // conv-C carries the fallback subject set by the hook when getConversation
+        // returned null, so the card never has to fall back on its own.
         expect(screen.getByText('Untitled conversation')).toBeTruthy();
     });
 
@@ -353,7 +318,6 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
                 isClaudeTab={true}
                 spendTrajectory={makeTrajectory()}
                 topSpendConversations={makeSpenders()}
-                conversations={makeConversations()}
             />,
         );
         expect(screen.getByText('$94.12')).toBeTruthy();
@@ -371,7 +335,6 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
                 isClaudeTab={true}
                 spendTrajectory={makeTrajectory()}
                 topSpendConversations={[]}
-                conversations={[]}
             />,
         );
         expect(screen.queryByText('Top conversations this month')).toBeNull();
@@ -384,7 +347,6 @@ describe('UsageBudgetCard — spend trajectory (credit variant)', () => {
                 isClaudeTab={true}
                 spendTrajectory={makeTrajectory()}
                 topSpendConversations={makeSpenders()}
-                conversations={makeConversations()}
             />,
         );
         expect(screen.queryByText(/On track for/)).toBeNull();

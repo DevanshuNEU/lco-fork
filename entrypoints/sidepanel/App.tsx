@@ -87,7 +87,6 @@ export default function App() {
                     weeklyEta={weeklyEta}
                     spendTrajectory={spendTrajectory}
                     topSpendConversations={topSpendConversations}
-                    conversations={conversations}
                 />
             </CollapsibleSection>
 

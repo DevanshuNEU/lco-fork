@@ -23,8 +23,7 @@ import type { UsageBudgetResult, UsageBudgetSession, UsageBudgetCredit, BudgetZo
 import { classifyZone } from '../../../lib/usage-budget';
 import { formatEtaLabel, type WeeklyEta } from '../../../lib/weekly-cap-eta';
 import { formatCurrencyCents } from '../../../lib/format';
-import type { SpendTrajectory, ConversationSpend } from '../../../lib/spend-trajectory';
-import type { ConversationRecord } from '../../../lib/conversation-store';
+import type { SpendTrajectory, TopSpender } from '../../../lib/spend-trajectory';
 
 interface Props {
     budget: UsageBudgetResult | null;
@@ -47,16 +46,11 @@ interface Props {
      */
     spendTrajectory?: SpendTrajectory | null;
     /**
-     * Top conversations of the current month, ranked descending by total cost.
+     * Top conversations of the current month, ranked descending by total cost,
+     * with subjects already resolved by the dashboard hook.
      * Credit-tier only; empty array everywhere else.
      */
-    topSpendConversations?: ConversationSpend[];
-    /**
-     * Recent conversations from the History panel. Used to join conversationId
-     * from `topSpendConversations` to a human-readable subject without an
-     * additional storage read.
-     */
-    conversations?: ConversationRecord[];
+    topSpendConversations?: TopSpender[];
 }
 
 // Zone-to-label mapping for the dot and fills. Mirrors the health dot
@@ -76,7 +70,6 @@ export default function UsageBudgetCard({
     weeklyEta,
     spendTrajectory,
     topSpendConversations,
-    conversations,
 }: Props) {
     // No data at all + the user is on a tab where we cannot fetch any.
     // Surface the obvious next action rather than a silent empty card.
@@ -108,7 +101,6 @@ export default function UsageBudgetCard({
             budget={budget}
             trajectory={spendTrajectory ?? null}
             topSpenders={topSpendConversations ?? []}
-            conversations={conversations ?? []}
         />;
 }
 
@@ -185,12 +177,10 @@ function CreditBudget({
     budget,
     trajectory,
     topSpenders,
-    conversations,
 }: {
     budget: UsageBudgetCredit;
     trajectory: SpendTrajectory | null;
-    topSpenders: ConversationSpend[];
-    conversations: ConversationRecord[];
+    topSpenders: TopSpender[];
 }) {
     const { utilizationPct, zone, statusLabel, resetLabel, currency, monthlyLimitCents } = budget;
     const safePct = Math.min(Math.max(utilizationPct, 0), 100);
@@ -245,7 +235,6 @@ function CreditBudget({
                             <SpenderRow
                                 key={spender.conversationId}
                                 spender={spender}
-                                conversations={conversations}
                                 currency={currency}
                             />
                         ))}
@@ -258,18 +247,14 @@ function CreditBudget({
 
 function SpenderRow({
     spender,
-    conversations,
     currency,
 }: {
-    spender: ConversationSpend;
-    conversations: ConversationRecord[];
+    spender: TopSpender;
     currency: string;
 }) {
-    const match = conversations.find((c) => c.id === spender.conversationId);
-    const subject = match?.dna?.subject || 'Untitled conversation';
     return (
         <div className="lco-dash-budget-spender">
-            <span className="lco-dash-budget-spender-subject">{subject}</span>
+            <span className="lco-dash-budget-spender-subject">{spender.subject}</span>
             <span className="lco-dash-budget-spender-cost">
                 {formatCurrencyCents(spender.totalCostCents, currency)}
             </span>

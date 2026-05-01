@@ -1,5 +1,5 @@
 // lib/spend-trajectory.ts
-// Spend Trajectory Agent — projects month-end spend for credit-tier (Enterprise)
+// Spend Trajectory Agent: projects month-end spend for credit-tier (Enterprise)
 // accounts and ranks the most expensive conversations of the current month.
 //
 // Pure functions only. No DOM refs, no chrome.* calls, no side effects.
@@ -14,9 +14,9 @@
 //   locally-tracked delta log instead, and ranks conversations by cost.
 //
 // Two exports:
-//   projectMonthEnd        — additive projection on top of the exact
-//                            currentUsedCents from the Anthropic endpoint.
-//   aggregateByConversation — pure grouping; ranked descending by cost.
+//   projectMonthEnd:        additive projection on top of the exact
+//                           currentUsedCents from the Anthropic endpoint.
+//   aggregateByConversation: pure grouping; ranked descending by cost.
 
 import type { UsageDelta } from './conversation-store';
 
@@ -31,9 +31,9 @@ export interface SpendTrajectory {
     daysRemaining: number;
     /**
      * Signal-quality label, drives copy variation in the card:
-     *   high   — n ≥ 14 distinct cost-bearing days AND CV < 0.3
-     *   medium — n ≥ 10 distinct cost-bearing days
-     *   low    — n ≥  7 distinct cost-bearing days
+     *   high:   n ≥ 14 distinct cost-bearing days AND CV < 0.3
+     *   medium: n ≥ 10 distinct cost-bearing days
+     *   low:    n ≥  7 distinct cost-bearing days
      * Below 7 distinct days projectMonthEnd returns null entirely
      * (the card renders a "need more data" placeholder).
      */
@@ -46,6 +46,17 @@ export interface ConversationSpend {
     totalCostCents: number;
     /** Count of cost-bearing delta records contributing to totalCostCents. */
     turnCount: number;
+}
+
+/**
+ * UI-facing variant of ConversationSpend that carries the human-readable subject
+ * resolved from the conversation record. The agent never produces this directly;
+ * the dashboard hook fetches the matching ConversationRecord for each top
+ * spender so the card can render a stable label even when the spender is older
+ * than the History list's truncation window.
+ */
+export interface TopSpender extends ConversationSpend {
+    subject: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -86,7 +97,7 @@ export function startOfNextMonth(now: number): number {
 /**
  * Calendar days remaining from `now` to the first of next month.
  * Counts whole days; a fractional remainder still counts as one day.
- * Floored at 0 — never negative even if the clock skews past month boundary.
+ * Floored at 0; never negative even if the clock skews past month boundary.
  */
 export function daysUntilNextMonth(now: number): number {
     const target = startOfNextMonth(now);
@@ -216,16 +227,22 @@ function coefficientOfVariation(values: number[]): number {
  *                        to scope to the current calendar month; pass 0 for
  *                        all-time. Deltas with timestamp < sinceTimestamp are
  *                        excluded.
+ * @param untilTimestamp  Inclusive upper bound (Unix ms). Pass `Date.now()` so
+ *                        future-timestamped deltas (clock skew, replay) cannot
+ *                        skew the ranking. Defaults to +Infinity for callers
+ *                        that have already filtered or do not care.
  */
 export function aggregateByConversation(
     deltas: UsageDelta[],
     sinceTimestamp: number,
+    untilTimestamp: number = Number.POSITIVE_INFINITY,
 ): ConversationSpend[] {
     // Sum costs in dollars to preserve sub-cent precision; round once at output.
     const totals = new Map<string, { dollars: number; turns: number }>();
 
     for (const delta of deltas) {
         if (delta.timestamp < sinceTimestamp) continue;
+        if (delta.timestamp > untilTimestamp) continue;
         if (delta.cost === null) continue;
         const entry = totals.get(delta.conversationId) ?? { dollars: 0, turns: 0 };
         entry.dollars += delta.cost;
