@@ -240,19 +240,22 @@ describe('fresh-session guard (GET-36)', () => {
     });
 
     it('does NOT apply at contextPct=30 exactly (ceiling is exclusive)', () => {
-        // contextPct = ceiling -> guard does not fire. On Sonnet 4.5
-        // (warn=50), 30% is still healthy by the primary classifier, but
-        // the test asserts the guard's exclusive boundary so a future
-        // change to warn does not silently hide a regression here.
+        // Verifies the guard's contextPct ceiling is exclusive: at
+        // contextPct=FRESH_SESSION_CONTEXT_CEIL the guard does NOT fire.
+        // On Sonnet 4.5 (warn=50), 30% is still healthy by the primary
+        // classifier, so the level assertion is the boundary check.
+        //
+        // The coaching match is a shape check, not proof of branch:
+        // both the guard and the primary fall-through call
+        // getRotCoaching(model, contextPct, isDetailHeavy) with the
+        // same arguments, so the string is identical from either path.
+        // We assert it cites the model only to confirm a non-empty,
+        // model-aware coaching string was produced.
         const h = computeHealthScore(input({
             model: SONNET_45,
             turnCount: 1,
             contextPct: FRESH_SESSION_CONTEXT_CEIL,
         }));
-        // Healthy by primary path, but we specifically verify the guard
-        // did not produce this result. Assert the coaching copy comes
-        // from the primary classifier (cites the model + window) rather
-        // than the guard's pure passthrough.
         expect(h.level).toBe('healthy');
         expect(h.coaching).toMatch(/Sonnet 4\.5/);
     });
