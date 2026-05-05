@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <rect width="128" height="128" rx="24" ry="24" fill="#1A1A1A"/>
+  <text
+    x="64" y="80"
+    font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif"
+    font-size="76"
+    font-weight="500"
+    fill="#c15f3c"
+    text-anchor="middle"
+  >S</text>
+  <text
+    x="64" y="108"
+    font-family="ui-monospace, Menlo, 'DejaVu Sans Mono', monospace"
+    font-size="9"
+    font-weight="700"
+    letter-spacing="4"
+    fill="#c15f3c"
+    fill-opacity="0.85"
+    text-anchor="middle"
+  >SAAR</text>
+</svg>
