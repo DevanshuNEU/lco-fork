@@ -17,7 +17,7 @@ const instrumentSerif = Instrument_Serif({
 export const metadata: Metadata = {
   title: 'Saar · AI Usage Coach',
   description:
-    'Platforms sell compute. Saar helps you use less of it. The AI usage coach for Claude, ChatGPT, and every tool coming next.',
+    'Platforms sell compute. Saar helps you use less of it. An AI usage coach for Claude.ai that meters tokens and cost, entirely in your browser.',
   metadataBase: new URL('https://getsaar.com'),
   openGraph: {
     title: 'Saar · AI Usage Coach',
