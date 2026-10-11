@@ -39,7 +39,7 @@ export default function InstallPage() {
           <div className="mt-6 grid grid-cols-3 gap-4 max-w-sm">
             {[
               ['136', 'commits'],
-              ['1,452', 'tests'],
+              ['1,808', 'tests'],
               ['39', 'merged PRs'],
             ].map(([value, label]) => (
               <div key={label} className="rounded-lg border border-saar-border bg-saar-card p-4 text-center">
