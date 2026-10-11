@@ -64,7 +64,7 @@ export default function SpecFooter() {
           <div className="font-mono text-xs text-saar-muted">
             Saar by{' '}
             <a
-              href="https://github.com/DevanshuNEU"
+              href="https://www.devanshuchicholikar.com"
               target="_blank"
               rel="noopener noreferrer"
               className="link-draw text-saar-secondary hover:text-saar-text"
